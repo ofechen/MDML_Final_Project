@@ -1,0 +1,38 @@
+---
+title: "MDML_Fianl_Project_YJ_FT_OC"
+output: html_notebook
+---
+Filter 
+  scaffolding problems
+  open text problems
+
+creating historical variables
+
+# problems solved (lower order ids)
+%/# correct (correct n lower order ids)
+Average # hints per problem that has hints
+% of problem in which student requested hints when hints are available
+Average # scaffolding
+Average time of first response
+% bottom out out of questions with hints
+Average historical attempt count
+
+i. Predicting students' using hints/scaffolding -- all data
+ii. Predict student bottom out behavior -- all data
+iii. Predict correct incorrect -- no hints/scaffolding
+
+For each we choose between 2 models (logistic regression and random forest)
+  auc
+  
+feature selection - forward stepwise selection
+
+
+
+
+```{r}
+#Pulling data
+rawdata <- read.csv("skill_builder_data.csv")
+
+#
+
+```
