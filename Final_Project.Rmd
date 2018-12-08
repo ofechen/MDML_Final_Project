@@ -27,12 +27,38 @@ For each we choose between 2 models (logistic regression and random forest)
 feature selection - forward stepwise selection
 
 
+```{r}
+library(tidyverse)
+```
 
 
 ```{r}
 #Pulling data
 rawdata <- read.csv("skill_builder_data.csv")
 
-#
+#Only consider main problem (main problem=1, scaffolding problem=0)
+rawdata <- rawdata %>% filter(original==1)
+
+#Use the latest order id as reference
+last_rawdata <- rawdata %>% group_by(user_id) %>% arrange(order_id) %>% slice(n())
+
+historical <- merge(last_rawdata, rawdata[c('user_id', 'order_id', 'problem_id', 'correct', 'hint_count', 'hint_total', 'bottom_hint', 'ms_first_response', 'attempt_count')], by = 'user_id', all.x = TRUE, allow.cartesian=TRUE)
+
+historical <- historical %>% filter(order_id.y < order_id.x) %>% distinct
+
+historical <- historical %>% group_by(user_id, order_id.x) %>% 
+  summarise(total_problem_solved = sum(correct.y),
+            num_problem = length(unique(problem_id.y)),
+            percent_problem_solved=total_problem_solved/num_problem,
+            questions_with_hints = sum(hint_total.y>0),
+            total_hints = sum(hint_total.y),
+            avg_hints_per_problem = total_hints/questions_with_hints,
+            problem_requested_hint = sum(hint_count.y>0),
+            percent_question_requested_hint = problem_requested_hint/num_problem,
+            avg_response_time = mean(ms_first_response.y),
+            total_bottom_hint = sum(bottom_hint.y == 1),
+            percent_bottom_out = total_bottom_hint/questions_with_hints,
+            avg_attempt_count = mean(attempt_count.y)) 
+
 
 ```
