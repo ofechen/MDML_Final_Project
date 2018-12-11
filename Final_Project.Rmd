@@ -3,28 +3,31 @@ title: "MDML_Fianl_Project_YJ_FT_OC"
 output: html_notebook
 author: Yeonji Jung, Frankie Tam, Ofer Chen
 ---
-#Descriptions
+#Description
 
 ##BACKGROUND
-Hints are an important learning aid. But students may have a tendency to use hints inappropriately. Offering hints indiscriminately can result in poor learning performance. For teachers to decide whether to show a hint or scaffolding to students in the further iteration, a prediction model on student hint-taking behaviors can be used to make adaptive decisions on whether to withhold or provide hints.
+Hints are an important learning aid. But students may have a tendency to use hints inappropriately. 
+Offering hints indiscriminately can result in poor learning performance. A prediction model on student hint-taking behaviors can be used to make adaptive decisions on whether to withhold or provide hints. Such model can be useful for teachers trying decide whether to show a hint or scaffolding to students in the further iterations.
 
 ##DATA 
-The dataset is the ASSISTments' skill builder problem sets data that gathered in the school year 2009 and 2010. ASSISTments is an online tutoring system that teachers can use to teach middle-school level Mathematics and identify student activities solving exercises on the system. 
+The dataset is taken from the ASSISTments' skill builder problem. The data set was gathered in the school year 2009/10. 
+ASSISTments is an online tutoring system that teachers can use to teach middle-school level Mathematics and identify student activities solving exercises on the system. 
 
 The dataset consists of log data of student activities including the chronological order of attempts (order_id), assignment id, problem id, user id, whether the first attempt is correct (correct), whether the number of attempts on the problem (attempt_count), the number of using hints on the problem (hint_count), whether or not the student asks for all hints (bottom_hint), the time in milliseconds for the student to complete the problem (overlap_time), time between start time and first student action (first_response_time), whether the first action is attempt, using hint, or using scaffolding (first_action). Each row represents a single problem of each student.
 
 The dataset has the following features:
-(a) questions are based on one specific skill, a question can have multiple skill taggings. 
-(b) students must answer three questions correct in a row to complete the assignment
-(c) if a student uses the tutoring ("hint" or "scaffolding"), the question will be marked incorrect
-(d) students will know immediately if they answered the question correctly
-(e) scaffolding means whether sutdent asks for the problem to be broken into steps
-(f) The bottom out hint is the last hint for a problem and will generally contain the problem’s answer.
+(a) Questions are based on one specific skill, a question can have multiple skill taggings 
+(b) Students must answer three questions correct in a row to complete the assignment
+(c) If a student uses the tutoring aids ("hint" or "scaffolding"), the question will be marked incorrect
+(d) Students will know immediately if they answered the question correctly
+(e) The scaffolding option will provide the student a break-down of the problem into small steps
+(f) The bottom out hint is the last hint for a problem and will generally contain the problem’s answer
 
-The raw dataset is available at https://sites.google.com/site/assistmentsdata/home/assistment-2009-2010-data/skill-builder-data-2009-2010. 
+The raw dataset is available at:
+https://sites.google.com/site/assistmentsdata/home/assistment-2009-2010-data/skill-builder-data-2009-2010
 
 ##PURPOSE
-Building a prediction model on student actions on next question
+Building a prediction model on student actions on next question, possible options are:
 (a) whether students will take a hint at first attempt (first_action)
 (b) whether students will take a bottom-out hint (bottom_hint)
 (c) whether students will answer correctly without hints (correct)
@@ -145,9 +148,9 @@ The five smallest and five largest coefficients in this model
   Largest:  tutor_modetutor > prev_percent_bottom_hint > answer_typefill_in_1 > 
             prev_percent_problem_requested_hint > prev_problem_requested_hint 
   
-The features I decided to drop: 
+The features we decided to drop: 
   (a) prev_problem_requested_hint, (b) prev_percent_correct, (c) prev_total_bottom_hint
-  These features had similar in the contents respectively with 
+  These features are somewhat similar in content respectively with 
   (a1) prev_percent_problem_requested_hint, (b1) prev_total_correct, and (c1) prev_percent_bottom_hint, 
   and each had relatively low coefficient than its compared feature. 
   
@@ -170,13 +173,15 @@ re_lg_hint_coef <- summary(re_lg_hint)[["coefficients"]]
 re_lg_hint_coef[order(re_lg_hint_coef[ , 1]), ]   
 ```
 
-The AUC of the logistic model predicting hint-taking on the test dataset is 82.84269 (*decreasing)
+The AUC of the logistic model predicting hint-taking on the test dataset is 82.84269 (*decreased from 84.2)
 
 The smallest and five largest coefficients in this model
   Smallest: answer_typechoose_1 < answer_typechoose_n < prev_percent_problem_requested_hint < 
             prev_total_correct 
   Largest:  tutor_modetutor > prev_percent_bottom_hint > answer_typefill_in_1 > 
             prev_avg_attempt_count > prev_avg_response_time
+            
+### Maybe add some explanation as to why we decided to stay without the 3 variables dropped if the AUC score is lower? maybe for easier interpretability?
             
 ```{r}
 #fit a random forest model on train

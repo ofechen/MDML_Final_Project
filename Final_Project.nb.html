@@ -9,6 +9,7 @@
 <meta name="generator" content="pandoc" />
 
 
+<meta name="author" content="Yeonji Jung, Frankie Tam, Ofer Chen" />
 
 
 <title>MDML_Fianl_Project_YJ_FT_OC</title>
@@ -168,29 +169,264 @@ $(document).ready(function () {
 
 
 <h1 class="title toc-ignore">MDML_Fianl_Project_YJ_FT_OC</h1>
+<h4 class="author"><em>Yeonji Jung, Frankie Tam, Ofer Chen</em></h4>
 
 </div>
 
 
 <!-- rnb-text-begin -->
-<p>Filter scaffolding problems open text problems</p>
-<p>creating historical variables</p>
-<div id="problems-solved-lower-order-ids" class="section level1">
-<h1>problems solved (lower order ids)</h1>
-<p>%/# correct (correct n lower order ids) Average # hints per problem that has hints % of problem in which student requested hints when hints are available Average # scaffolding Average time of first response % bottom out out of questions with hints Average historical attempt count</p>
-<ol style="list-style-type: lower-roman">
-<li>Predicting students’ using hints/scaffolding – all data</li>
-<li>Predict student bottom out behavior – all data</li>
-<li>Predict correct incorrect – no hints/scaffolding</li>
-</ol>
-<p>For each we choose between 2 models (logistic regression and random forest) auc</p>
-<p>feature selection - forward stepwise selection</p>
+<div id="description" class="section level1">
+<h1>Description</h1>
+<div id="background" class="section level2">
+<h2>BACKGROUND</h2>
+<p>Hints are an important learning aid. But students may have a tendency to use hints inappropriately. Offering hints indiscriminately can result in poor learning performance. A prediction model on student hint-taking behaviors can be used to make adaptive decisions on whether to withhold or provide hints. Such model can be useful for teachers trying decide whether to show a hint or scaffolding to students in the further iterations.</p>
+</div>
+<div id="data" class="section level2">
+<h2>DATA</h2>
+<p>The dataset is taken from the ASSISTments’ skill builder problem. The data set was gathered in the school year 2009/10. ASSISTments is an online tutoring system that teachers can use to teach middle-school level Mathematics and identify student activities solving exercises on the system.</p>
+<p>The dataset consists of log data of student activities including the chronological order of attempts (order_id), assignment id, problem id, user id, whether the first attempt is correct (correct), whether the number of attempts on the problem (attempt_count), the number of using hints on the problem (hint_count), whether or not the student asks for all hints (bottom_hint), the time in milliseconds for the student to complete the problem (overlap_time), time between start time and first student action (first_response_time), whether the first action is attempt, using hint, or using scaffolding (first_action). Each row represents a single problem of each student.</p>
+<p>The dataset has the following features: (a) Questions are based on one specific skill, a question can have multiple skill taggings (b) Students must answer three questions correct in a row to complete the assignment (c) If a student uses the tutoring aids (“hint” or “scaffolding”), the question will be marked incorrect (d) Students will know immediately if they answered the question correctly (e) The scaffolding option will provide the student a break-down of the problem into small steps (f) The bottom out hint is the last hint for a problem and will generally contain the problem’s answer</p>
+<p>The raw dataset is available at: <a href="https://sites.google.com/site/assistmentsdata/home/assistment-2009-2010-data/skill-builder-data-2009-2010" class="uri">https://sites.google.com/site/assistmentsdata/home/assistment-2009-2010-data/skill-builder-data-2009-2010</a></p>
+</div>
+<div id="purpose" class="section level2">
+<h2>PURPOSE</h2>
+<p>Building a prediction model on student actions on next question, possible options are: (a) whether students will take a hint at first attempt (first_action) (b) whether students will take a bottom-out hint (bottom_hint) (c) whether students will answer correctly without hints (correct)</p>
+</div>
+<div id="approach" class="section level2">
+<h2>APPROACH</h2>
+<p>We’ll build three different models predicting student actions on next question: (a) hint-taking, (b) bottom-out hint-taking, (c) correct answers. For each part, we select featuers, split train and test set, fit two models of logistic regression and random forest, test it with test dataset, and choose between 2 models calculating AUC. (why you think this is a reasonable approach to take).</p>
+</div>
+</div>
+<div id="part-a-import-and-clean-the-data" class="section level1">
+<h1>Part A: Import and Clean the Data</h1>
+<div id="import-packages-and-data" class="section level2">
+<h2>Import packages and data</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI2xvYWQgcGFja2FnZXNcbmxpYnJhcnkodGlkeXZlcnNlKVxubGlicmFyeShyYW5kb21Gb3Jlc3QpXG5saWJyYXJ5KGRvUGFyYWxsZWwpXG5saWJyYXJ5KGZvcmVhY2gpXG5saWJyYXJ5KGNhcilcbmxpYnJhcnkoUk9DUilcblxuI2ltcG9ydCB0aGUgZGF0YVxuZGZfcmF3IDwtIHJlYWQuY3N2KFwic2tpbGxfYnVpbGRlcl9kYXRhLmNzdlwiKVxuYGBgIn0= -->
+<pre class="r"><code>#load packages
+library(tidyverse)
+library(randomForest)
+library(doParallel)
+library(foreach)
+library(car)
+library(ROCR)
+
+#import the data
+df_raw &lt;- read.csv(&quot;skill_builder_data.csv&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="clean-the-data" class="section level2">
+<h2>Clean the data</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI2ZpbHRlciB0aGUgZm9sbG93aW5nIHZhbHVlc1xuIyMoXCJvcmlnaW5hbFwiKSBzY2FmZm9sZGluZyBwcm9ibGVtcyAoMCk7IHRoaXMgaXMgbm90IHJlbGV2YW50IHRvIHRoaXMgcHJvamVjdFxuIyMoXCJmaXJzdF9hY3Rpb25cIikgZW1wdHkgdmFsdWVzOyBzdHVkZW50IGNsaWNrZWQgb24gdGhlIHByb2JsZW0gYnV0IGRpZCBub3RoaW5nIGVsc2VcbiMjKFwiZmlyc3RfYWN0aW9uXCIpIHNjYWZmb2xkaW5nIHZhbHVlczsgc2NhZmZvbGRpbmcgb3Bwb3J0dW5pdGllcyB2YXJpZWQgYWNyb3NzIHByb2JsZW0gc2V0c1xuIyMoXCJhbnN3ZXJfdHlwZVwiKSBvcGVuX3Jlc3BvbnNlOyB0aGlzIHR5cGUgb2YgYW5zd2VycyBhbHdheXMgbWFya2VkIGNvcnJlY3RcbiMjKFwibXNfZmlyc3RfcmVzcG9uc2VcIikgbmVnYXRpdmUgdmFsdWVzIGFuZCB6ZXJvXG4jIyhcIm92ZXJsYXBfdGltZVwiKSBuZWdhdGl2ZSB2YWx1ZXMgYW5kIHplcm9cblxuZGZfY2xlYW4gPC0gZGZfcmF3ICU+JSBcbiAgZmlsdGVyKG9yaWdpbmFsPT0xLCBmaXJzdF9hY3Rpb24hPTIsICFpcy5uYShmaXJzdF9hY3Rpb24pLCBcbiAgICAgICAgIGFuc3dlcl90eXBlIT1cIm9wZW5fcmVzcG9uc2VcIiwgbXNfZmlyc3RfcmVzcG9uc2UgPiAwLCBvdmVybGFwX3RpbWUgPiAwKSAlPiVcbiAgcmVuYW1lKHByb2JsZW1fdHlwZSA9IHR5cGUpXG5cbiNyZXZhbHVlIHRoZSBmb2xsb3dpbmcgY29sdW1uczpcbiMjKFwiYm90dG9tX2hpbnRcIikgcmVwbGFjZSBlbXB0eSB2YWx1ZXMgaW50byAwOyBpdCBtZWFucyB0aGUgc3R1ZGVudCBkaWQgbm90IGFzayBmb3IgYSBoaW50XG5kZl9jbGVhbiRib3R0b21faGludFtpcy5uYShkZl9jbGVhbiRib3R0b21faGludCldIDwtIDBcbmBgYCJ9 -->
+<pre class="r"><code>#filter the following values
+##(&quot;original&quot;) scaffolding problems (0); this is not relevant to this project
+##(&quot;first_action&quot;) empty values; student clicked on the problem but did nothing else
+##(&quot;first_action&quot;) scaffolding values; scaffolding opportunities varied across problem sets
+##(&quot;answer_type&quot;) open_response; this type of answers always marked correct
+##(&quot;ms_first_response&quot;) negative values and zero
+##(&quot;overlap_time&quot;) negative values and zero
+
+df_clean &lt;- df_raw %&gt;% 
+  filter(original==1, first_action!=2, !is.na(first_action), 
+         answer_type!=&quot;open_response&quot;, ms_first_response &gt; 0, overlap_time &gt; 0) %&gt;%
+  rename(problem_type = type)
+
+#revalue the following columns:
+##(&quot;bottom_hint&quot;) replace empty values into 0; it means the student did not ask for a hint
+df_clean$bottom_hint[is.na(df_clean$bottom_hint)] &lt;- 0</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+</div>
+<div id="part-b-hint-taking-prediction" class="section level1">
+<h1>Part B: Hint-Taking Prediction</h1>
+<div id="feature-engineering-make-historical-features" class="section level2">
+<h2>Feature engineering; make historical features</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI3VzZSB0aGUgbGF0ZXN0IG9yZGVyIGlkIGFzIHJlZmVyZW5jZVxuZGZfbGFzdCA8LSBkZl9jbGVhbiAlPiUgZ3JvdXBfYnkodXNlcl9pZCkgJT4lIGFycmFuZ2Uob3JkZXJfaWQpICU+JSBzbGljZShuKCkpXG5cbmRmX2hpc3QgPC0gbWVyZ2UoZGZfbGFzdCwgZGZfY2xlYW5bYygndXNlcl9pZCcsICdvcmRlcl9pZCcsICdwcm9ibGVtX2lkJywgJ2NvcnJlY3QnLCAnaGludF9jb3VudCcsICdoaW50X3RvdGFsJywgJ2JvdHRvbV9oaW50JywgJ21zX2ZpcnN0X3Jlc3BvbnNlJywgJ2F0dGVtcHRfY291bnQnKV0sIGJ5ID0gJ3VzZXJfaWQnLCBhbGwueCA9IFRSVUUsIGFsbG93LmNhcnRlc2lhbj1UUlVFKVxuXG5kZl9oaXN0IDwtIGRmX2hpc3QgJT4lIGZpbHRlcihvcmRlcl9pZC55IDwgb3JkZXJfaWQueClcblxuZGZfaGlzdCA8LSBkZl9oaXN0ICU+JSBncm91cF9ieSh1c2VyX2lkLCBvcmRlcl9pZC54KSAlPiUgXG4gIHN1bW1hcmlzZShwcmV2X3RvdGFsX2NvcnJlY3QgPSBzdW0oY29ycmVjdC55KSxcbiAgICAgICAgICAgIHByZXZfbnVtX3Byb2JsZW0gPSBsZW5ndGgodW5pcXVlKHByb2JsZW1faWQueSkpLFxuICAgICAgICAgICAgcHJldl9wZXJjZW50X2NvcnJlY3Q9cHJldl90b3RhbF9jb3JyZWN0L3ByZXZfbnVtX3Byb2JsZW0sXG4gICAgICAgICAgICBwcmV2X3F1ZXN0aW9uc193aXRoX2hpbnRzID0gc3VtKGhpbnRfdG90YWwueT4wKSxcbiAgICAgICAgICAgIHByZXZfdG90YWxfaGludHMgPSBzdW0oaGludF90b3RhbC55KSxcbiAgICAgICAgICAgIHByZXZfYXZnX2hpbnRzX3Blcl9wcm9ibGVtID0gcHJldl90b3RhbF9oaW50cy9wcmV2X3F1ZXN0aW9uc193aXRoX2hpbnRzLFxuICAgICAgICAgICAgcHJldl9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ID0gc3VtKGhpbnRfY291bnQueT4wKSxcbiAgICAgICAgICAgIHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ID0gcHJldl9wcm9ibGVtX3JlcXVlc3RlZF9oaW50L3ByZXZfbnVtX3Byb2JsZW0sXG4gICAgICAgICAgICBwcmV2X2F2Z19yZXNwb25zZV90aW1lID0gbWVhbihtc19maXJzdF9yZXNwb25zZS55KSxcbiAgICAgICAgICAgIHByZXZfdG90YWxfYm90dG9tX2hpbnQgPSBzdW0oYm90dG9tX2hpbnQueSA9PSAxKSxcbiAgICAgICAgICAgIHByZXZfcGVyY2VudF9ib3R0b21faGludCA9IHByZXZfdG90YWxfYm90dG9tX2hpbnQvcHJldl9xdWVzdGlvbnNfd2l0aF9oaW50cyxcbiAgICAgICAgICAgIHByZXZfYXZnX2F0dGVtcHRfY291bnQgPSBtZWFuKGF0dGVtcHRfY291bnQueSkpIFxuXG5kZl9oaXN0IDwtIHJlcGxhY2UoZGZfaGlzdCwgaXMubmEoZGZfaGlzdCksIDApXG5cbmRmX2ZpbiA8LSAgZGZfY2xlYW4gJT4lIGxlZnRfam9pbihkZl9oaXN0KVxuXG4jY29udmVydCB0byBmYWN0b3JzXG5kZl9maW4gPC0gZGZfZmluICU+JVxuICBtdXRhdGVfYXQodmFycyhmaXJzdF9hY3Rpb24sY29ycmVjdCxib3R0b21faGludCxwcm9ibGVtX2lkLHRlYWNoZXJfaWQsIHNjaG9vbF9pZCksZnVucyhhcy5mYWN0b3IpKVxuYGBgIn0= -->
+<pre class="r"><code>#use the latest order id as reference
+df_last &lt;- df_clean %&gt;% group_by(user_id) %&gt;% arrange(order_id) %&gt;% slice(n())
+
+df_hist &lt;- merge(df_last, df_clean[c('user_id', 'order_id', 'problem_id', 'correct', 'hint_count', 'hint_total', 'bottom_hint', 'ms_first_response', 'attempt_count')], by = 'user_id', all.x = TRUE, allow.cartesian=TRUE)
+
+df_hist &lt;- df_hist %&gt;% filter(order_id.y &lt; order_id.x)
+
+df_hist &lt;- df_hist %&gt;% group_by(user_id, order_id.x) %&gt;% 
+  summarise(prev_total_correct = sum(correct.y),
+            prev_num_problem = length(unique(problem_id.y)),
+            prev_percent_correct=prev_total_correct/prev_num_problem,
+            prev_questions_with_hints = sum(hint_total.y&gt;0),
+            prev_total_hints = sum(hint_total.y),
+            prev_avg_hints_per_problem = prev_total_hints/prev_questions_with_hints,
+            prev_problem_requested_hint = sum(hint_count.y&gt;0),
+            prev_percent_problem_requested_hint = prev_problem_requested_hint/prev_num_problem,
+            prev_avg_response_time = mean(ms_first_response.y),
+            prev_total_bottom_hint = sum(bottom_hint.y == 1),
+            prev_percent_bottom_hint = prev_total_bottom_hint/prev_questions_with_hints,
+            prev_avg_attempt_count = mean(attempt_count.y)) 
+
+df_hist &lt;- replace(df_hist, is.na(df_hist), 0)
+
+df_fin &lt;-  df_clean %&gt;% left_join(df_hist)
+
+#convert to factors
+df_fin &lt;- df_fin %&gt;%
+  mutate_at(vars(first_action,correct,bottom_hint,problem_id,teacher_id, school_id),funs(as.factor))</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="create-a-training-set-test-set" class="section level2">
+<h2>Create a training Set / test Set</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI3JhbmRvbWx5IHNodWZmbGUgdGhlIGRhdGFcbnNldC5zZWVkKDEzMTQpXG5kZl9maW4gPC0gZGZfZmluICU+JSBzbGljZShzYW1wbGUoMTpuKCkpKVxuXG4jY3JlYXRlIHRyYWluX2hhbGYgYW5kIHRlc3RfaGFsZlxuc3BsaXRzaXplID0gZmxvb3IobnJvdyhkZl9maW4pLzIpXG50cmFpbiA8LSBkZl9maW4gJT4lIHNsaWNlKDE6c3BsaXRzaXplKVxudGVzdCA8LSBkZl9maW4gJT4lIHNsaWNlKHNwbGl0c2l6ZSsxOm4oKSlcbmBgYCJ9 -->
+<pre class="r"><code>#randomly shuffle the data
+set.seed(1314)
+df_fin &lt;- df_fin %&gt;% slice(sample(1:n()))
+
+#create train_half and test_half
+splitsize = floor(nrow(df_fin)/2)
+train &lt;- df_fin %&gt;% slice(1:splitsize)
+test &lt;- df_fin %&gt;% slice(splitsize+1:n())</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="fit-a-logistic-model-on-train-and-compute-auc-on-test-set" class="section level2">
+<h2>Fit a logistic model on train and compute AUC on test set</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI2ZpdCBhIHJhbmRvbSBmb3Jlc3QgbW9kZWwgb24gdHJhaW5cbmxnX2hpbnQgPC0gZ2xtKGZpcnN0X2FjdGlvbiB+IHR1dG9yX21vZGUgKyBhbnN3ZXJfdHlwZSArIHByZXZfdG90YWxfY29ycmVjdCArIFxuICAgICAgICAgICAgICAgICBwcmV2X3BlcmNlbnRfY29ycmVjdCArIHByZXZfcHJvYmxlbV9yZXF1ZXN0ZWRfaGludCArIFxuICAgICAgICAgICAgICAgICBwcmV2X3BlcmNlbnRfcHJvYmxlbV9yZXF1ZXN0ZWRfaGludCArIHByZXZfYXZnX3Jlc3BvbnNlX3RpbWUgKyBcbiAgICAgICAgICAgICAgICAgcHJldl90b3RhbF9ib3R0b21faGludCArIHByZXZfcGVyY2VudF9ib3R0b21fb3V0ICsgcHJldl9hdmdfYXR0ZW1wdF9jb3VudCwgXG4gICAgICAgICAgICAgICBkYXRhPXRyYWluLCBmYW1pbHk9XCJiaW5vbWlhbFwiKVxuXG4jY29tcHV0ZSBBVUMgb2YgdGhpcyBtb2RlbCBvbiB0aGUgdGVzdCBkYXRhc2V0ICBcbnRlc3QkbGcuaGludC5wcmVkLnByb2IgPC0gcHJlZGljdChsZ19oaW50LG5ld2RhdGE9dGVzdCx0eXBlPSdyZXNwb25zZScpXG50ZXN0LmxnLmhpbnQucHJlZCA8LSBwcmVkaWN0aW9uKHRlc3QkbGcuaGludC5wcmVkLnByb2IsIHRlc3QkZmlyc3RfYWN0aW9uKVxudGVzdC5sZy5oaW50LnBlcmYgPC0gcGVyZm9ybWFuY2UodGVzdC5sZy5oaW50LnByZWQsIFwiYXVjXCIpXG5jYXQoJ3RoZSBhdWMgc2NvcmUgaXMgJywgMTAwKnRlc3QubGcuaGludC5wZXJmQHkudmFsdWVzW1sxXV0sIFwiXFxuXCIpICBcblxuI2NhbGN1bGF0ZSB0aGUgZml2ZSBzbWFsbGVzdCBhbmQgZml2ZSBsYXJnZXN0IGNvZWZmaWNpZW50cyBcbmxnX2hpbnRfY29lZiA8LSBzdW1tYXJ5KGxnX2hpbnQpW1tcImNvZWZmaWNpZW50c1wiXV1cbmxnX2hpbnRfY29lZltvcmRlcihsZ19oaW50X2NvZWZbICwgMV0pLCBdICAgXG5gYGAifQ== -->
+<pre class="r"><code>#fit a random forest model on train
+lg_hint &lt;- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
+                 prev_percent_correct + prev_problem_requested_hint + 
+                 prev_percent_problem_requested_hint + prev_avg_response_time + 
+                 prev_total_bottom_hint + prev_percent_bottom_out + prev_avg_attempt_count, 
+               data=train, family=&quot;binomial&quot;)
+
+#compute AUC of this model on the test dataset  
+test$lg.hint.pred.prob &lt;- predict(lg_hint,newdata=test,type='response')
+test.lg.hint.pred &lt;- prediction(test$lg.hint.pred.prob, test$first_action)
+test.lg.hint.perf &lt;- performance(test.lg.hint.pred, &quot;auc&quot;)
+cat('the auc score is ', 100*test.lg.hint.perf@y.values[[1]], &quot;\n&quot;)  
+
+#calculate the five smallest and five largest coefficients 
+lg_hint_coef &lt;- summary(lg_hint)[[&quot;coefficients&quot;]]
+lg_hint_coef[order(lg_hint_coef[ , 1]), ]   </code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Before fitting a model, I dropped some features (which I hoped to embed in the model); problem_type = only 1 factor problem_id = more than 53 factors teacher_id = more than 53 factors</p>
+<p>The AUC of the logistic model predicting hint-taking on the test dataset is 84.2032</p>
+<p>The five smallest and five largest coefficients in this model Smallest: answer_typechoose_1 &lt; answer_typechoose_n &lt; prev_percent_correct &lt; prev_total_bottom_hint &lt; prev_total_correct Largest: tutor_modetutor &gt; prev_percent_bottom_hint &gt; answer_typefill_in_1 &gt; prev_percent_problem_requested_hint &gt; prev_problem_requested_hint</p>
+<p>The features we decided to drop: (a) prev_problem_requested_hint, (b) prev_percent_correct, (c) prev_total_bottom_hint These features are somewhat similar in content respectively with (a1) prev_percent_problem_requested_hint, (b1) prev_total_correct, and (c1) prev_percent_bottom_hint, and each had relatively low coefficient than its compared feature.</p>
+</div>
+<div id="drop-the-predictors-and-refit-the-logistic-model" class="section level2">
+<h2>Drop the predictors and refit the logistic model</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI3JlZml0IGEgcmFuZG9tIGZvcmVzdCBtb2RlbCBvbiB0cmFpblxucmVfbGdfaGludCA8LSBnbG0oZmlyc3RfYWN0aW9uIH4gdHV0b3JfbW9kZSArIGFuc3dlcl90eXBlICsgcHJldl90b3RhbF9jb3JyZWN0ICsgXG4gICAgICAgICAgICAgICAgIHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ICsgcHJldl9hdmdfcmVzcG9uc2VfdGltZSArIFxuICAgICAgICAgICAgICAgICBwcmV2X3BlcmNlbnRfYm90dG9tX291dCArIHByZXZfYXZnX2F0dGVtcHRfY291bnQsIFxuICAgICAgICAgICAgICAgZGF0YT10cmFpbiwgZmFtaWx5PVwiYmlub21pYWxcIilcblxuI2NvbXB1dGUgQVVDIG9mIHRoaXMgbW9kZWwgb24gdGhlIHRlc3QgZGF0YXNldCAgXG50ZXN0JHJlLmxnLmhpbnQucHJlZC5wcm9iIDwtIHByZWRpY3QocmVfbGdfaGludCxuZXdkYXRhPXRlc3QsdHlwZT0ncmVzcG9uc2UnKVxudGVzdC5yZS5sZy5oaW50LnByZWQgPC0gcHJlZGljdGlvbih0ZXN0JHJlLmxnLmhpbnQucHJlZC5wcm9iLCB0ZXN0JGZpcnN0X2FjdGlvbilcbnRlc3QucmUubGcuaGludC5wZXJmIDwtIHBlcmZvcm1hbmNlKHRlc3QucmUubGcuaGludC5wcmVkLCBcImF1Y1wiKVxuY2F0KCd0aGUgYXVjIHNjb3JlIGlzICcsIDEwMCp0ZXN0LnJlLmxnLmhpbnQucGVyZkB5LnZhbHVlc1tbMV1dLCBcIlxcblwiKSAgXG5cbiNjYWxjdWxhdGUgdGhlIGZpdmUgc21hbGxlc3QgYW5kIGZpdmUgbGFyZ2VzdCBjb2VmZmljaWVudHMgXG5yZV9sZ19oaW50X2NvZWYgPC0gc3VtbWFyeShyZV9sZ19oaW50KVtbXCJjb2VmZmljaWVudHNcIl1dXG5yZV9sZ19oaW50X2NvZWZbb3JkZXIocmVfbGdfaGludF9jb2VmWyAsIDFdKSwgXSAgIFxuYGBgIn0= -->
+<pre class="r"><code>#refit a random forest model on train
+re_lg_hint &lt;- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
+                 prev_percent_problem_requested_hint + prev_avg_response_time + 
+                 prev_percent_bottom_out + prev_avg_attempt_count, 
+               data=train, family=&quot;binomial&quot;)
+
+#compute AUC of this model on the test dataset  
+test$re.lg.hint.pred.prob &lt;- predict(re_lg_hint,newdata=test,type='response')
+test.re.lg.hint.pred &lt;- prediction(test$re.lg.hint.pred.prob, test$first_action)
+test.re.lg.hint.perf &lt;- performance(test.re.lg.hint.pred, &quot;auc&quot;)
+cat('the auc score is ', 100*test.re.lg.hint.perf@y.values[[1]], &quot;\n&quot;)  
+
+#calculate the five smallest and five largest coefficients 
+re_lg_hint_coef &lt;- summary(re_lg_hint)[[&quot;coefficients&quot;]]
+re_lg_hint_coef[order(re_lg_hint_coef[ , 1]), ]   </code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The AUC of the logistic model predicting hint-taking on the test dataset is 82.84269 (*decreased from 84.2)</p>
+<p>The smallest and five largest coefficients in this model Smallest: answer_typechoose_1 &lt; answer_typechoose_n &lt; prev_percent_problem_requested_hint &lt; prev_total_correct Largest: tutor_modetutor &gt; prev_percent_bottom_hint &gt; answer_typefill_in_1 &gt; prev_avg_attempt_count &gt; prev_avg_response_time</p>
+<div id="maybe-add-some-explanation-as-to-why-we-decided-to-stay-without-the-3-variables-dropped-if-the-auc-score-is-lower-maybe-for-easier-interpretability" class="section level3">
+<h3>Maybe add some explanation as to why we decided to stay without the 3 variables dropped if the AUC score is lower? maybe for easier interpretability?</h3>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI2ZpdCBhIHJhbmRvbSBmb3Jlc3QgbW9kZWwgb24gdHJhaW5cbnJmX2hpbnQgPC0gcmFuZG9tRm9yZXN0KGZpcnN0X2FjdGlvbiB+IHR1dG9yX21vZGUgKyBhbnN3ZXJfdHlwZSArIHByZXZfdG90YWxfY29ycmVjdCArIFxuICAgICAgICAgICAgICAgICBwcmV2X3BlcmNlbnRfcHJvYmxlbV9yZXF1ZXN0ZWRfaGludCArIHByZXZfYXZnX3Jlc3BvbnNlX3RpbWUgKyBcbiAgICAgICAgICAgICAgICAgcHJldl9wZXJjZW50X2JvdHRvbV9vdXQgKyBwcmV2X2F2Z19hdHRlbXB0X2NvdW50LCBkYXRhPXRyYWluLCBudHJlZT0yMDAsIFxuICAgICAgICAgICAgICAgICBuYS5hY3Rpb249bmEub21pdClcblxuI2NvbXB1dGUgQVVDIG9mIHRoaXMgbW9kZWwgb24gdGhlIHRlc3QgZGF0YXNldCAgXG50ZXN0JHJmLmhpbnQucHJlZC5wcm9iIDwtIHByZWRpY3QocmZfaGludCxuZXdkYXRhPXRlc3QsdHlwZT0ncHJvYicpWywyXVxudGVzdC5yZi5oaW50LnByZWQgPC0gcHJlZGljdGlvbih0ZXN0JHJmLmhpbnQucHJlZC5wcm9iLCB0ZXN0JGZpcnN0X2FjdGlvbilcbnRlc3QucmYuaGludC5wZXJmIDwtIHBlcmZvcm1hbmNlKHRlc3QucmYuaGludC5wcmVkLCBcImF1Y1wiKVxuY2F0KCd0aGUgYXVjIHNjb3JlIGlzICcsIDEwMCp0ZXN0LnJmLmhpbnQucGVyZkB5LnZhbHVlc1tbMV1dLCBcIlxcblwiKSBcbmBgYCJ9 -->
+<pre class="r"><code>#fit a random forest model on train
+rf_hint &lt;- randomForest(first_action ~ tutor_mode + answer_type + prev_total_correct + 
+                 prev_percent_problem_requested_hint + prev_avg_response_time + 
+                 prev_percent_bottom_out + prev_avg_attempt_count, data=train, ntree=200, 
+                 na.action=na.omit)
+
+#compute AUC of this model on the test dataset  
+test$rf.hint.pred.prob &lt;- predict(rf_hint,newdata=test,type='prob')[,2]
+test.rf.hint.pred &lt;- prediction(test$rf.hint.pred.prob, test$first_action)
+test.rf.hint.perf &lt;- performance(test.rf.hint.pred, &quot;auc&quot;)
+cat('the auc score is ', 100*test.rf.hint.perf@y.values[[1]], &quot;\n&quot;) </code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The computed auc score is 70.20511. *How does the AUC of the random forest compare with the AUC of the logistic regression model?</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuI2NvbXBhcmVzIHRoZSBwZXJmb3JtYW5jZSBvZiB0d28gbW9kZWxzIHVzaW5nIHRoZSBwbG90c1xuIyNjcmVhdGUgYSBwZXJmb3JtYW5jZSBwbG90XG50ZXN0LjEgPC0gdGVzdCAlPiUgbXV0YXRlKGZpcnN0X2FjdGlvbiA9IGFzLmludGVnZXIoZmlyc3RfYWN0aW9uKS0xKVxucGxvdC5kYXRhLnJmIDwtIHRlc3QuMSAlPiUgYXJyYW5nZShkZXNjKHJmLmhpbnQucHJlZC5wcm9iKSkgJT4lIFxuICBtdXRhdGUobnVtcmFuayA9IHJvd19udW1iZXIoKSwgcGVyY2VudC5maXJzdC5hY3Rpb24gPSBjdW1zdW0oZmlyc3RfYWN0aW9uKS9udW1yYW5rLFxuICAgICAgICAgbWV0aG9kID0gcmVwKFwiUmFuZG9tIEZvcmVzdFwiLG4oKSkpICU+JSBcbiAgc2VsZWN0KG51bXJhbmssIHBlcmNlbnQuZmlyc3QuYWN0aW9uLCBtZXRob2QpXG5cbnBsb3QuZGF0YS5sbSA8LSB0ZXN0LjEgJT4lIGFycmFuZ2UoZGVzYyhyZS5sZy5oaW50LnByZWQucHJvYikpICU+JSBcbiAgbXV0YXRlKG51bXJhbmsgPSByb3dfbnVtYmVyKCksIHBlcmNlbnQuZmlyc3QuYWN0aW9uID0gY3Vtc3VtKGZpcnN0X2FjdGlvbikvbnVtcmFuayxcbiAgICAgICAgIG1ldGhvZCA9IHJlcChcIkxvZ2lzdGljIFJlZ3Jlc3Npb25cIixuKCkpKSAlPiUgXG4gIHNlbGVjdChudW1yYW5rLCBwZXJjZW50LmZpcnN0LmFjdGlvbixtZXRob2QpXG5cbnBsb3QuZGF0YSA8LSBiaW5kX3Jvd3MocGxvdC5kYXRhLnJmLHBsb3QuZGF0YS5sbSlcblxuIyNjcmVhdGUgcGxvdFxudGhlbWVfc2V0KHRoZW1lX2J3KCkpXG5wIDwtIGdncGxvdChkYXRhPXBsb3QuZGF0YSwgYWVzKHg9bnVtcmFuaywgeT1wZXJjZW50LmZpcnN0LmFjdGlvbiwgY29sID0gbWV0aG9kKSkgXG5wIDwtIHAgKyBnZW9tX2xpbmUoKVxucCA8LSBwICsgeGxhYignTnVtYmVyIG9mIEF0dGVtcHRzJykgKyB4bGltKDEsMTAwMClcbnAgPC0gcCArIHNjYWxlX3lfY29udGludW91cyhcIlBlcmNlbnQgb2YgQXR0ZW1wdHMgd2l0aCBIaW50XCIsIGxpbWl0cz1jKDAuNSwxKSwgbGFiZWxzPXNjYWxlczo6cGVyY2VudClcbnBcbmBgYCJ9 -->
+<pre class="r"><code>#compares the performance of two models using the plots
+##create a performance plot
+test.1 &lt;- test %&gt;% mutate(first_action = as.integer(first_action)-1)
+plot.data.rf &lt;- test.1 %&gt;% arrange(desc(rf.hint.pred.prob)) %&gt;% 
+  mutate(numrank = row_number(), percent.first.action = cumsum(first_action)/numrank,
+         method = rep(&quot;Random Forest&quot;,n())) %&gt;% 
+  select(numrank, percent.first.action, method)
+
+plot.data.lm &lt;- test.1 %&gt;% arrange(desc(re.lg.hint.pred.prob)) %&gt;% 
+  mutate(numrank = row_number(), percent.first.action = cumsum(first_action)/numrank,
+         method = rep(&quot;Logistic Regression&quot;,n())) %&gt;% 
+  select(numrank, percent.first.action,method)
+
+plot.data &lt;- bind_rows(plot.data.rf,plot.data.lm)
+
+##create plot
+theme_set(theme_bw())
+p &lt;- ggplot(data=plot.data, aes(x=numrank, y=percent.first.action, col = method)) 
+p &lt;- p + geom_line()
+p &lt;- p + xlab('Number of Attempts') + xlim(1,1000)
+p &lt;- p + scale_y_continuous(&quot;Percent of Attempts with Hint&quot;, limits=c(0.5,1), labels=scales::percent)
+p</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Overall, logistic regression shows a better performance than that of the random forest model.</p>
+</div>
+</div>
+</div>
+<div id="part-c-bottom-up-hint-taking-prediction" class="section level1">
+<h1>Part C: Bottom-up-Hint-Taking Prediction</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
 <!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="part-d-hint-taking-prediction" class="section level1">
+<h1>Part D: Hint-Taking Prediction</h1>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="part-scaffolding-taking-prediction" class="section level1">
+<h1>Part #: Scaffolding-Taking Prediction</h1>
+<p>** Right now, I don’t want to predict scaffolding. This is too complicated to consider since if a problem has scaffolding and the student answers incorrectly or asks for the problem to be broken into steps, a new problem will be created called a scaffolding problem. LMK</p>
+<!-- rnb-text-end -->
 </div>
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiTURNTF9GaWFubF9Qcm9qZWN0X1lKX0ZUX09DIgpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sKLS0tCkZpbHRlciAKICBzY2FmZm9sZGluZyBwcm9ibGVtcwogIG9wZW4gdGV4dCBwcm9ibGVtcwoKY3JlYXRpbmcgaGlzdG9yaWNhbCB2YXJpYWJsZXMKCiMgcHJvYmxlbXMgc29sdmVkIChsb3dlciBvcmRlciBpZHMpCiUvIyBjb3JyZWN0IChjb3JyZWN0IG4gbG93ZXIgb3JkZXIgaWRzKQpBdmVyYWdlICMgaGludHMgcGVyIHByb2JsZW0gdGhhdCBoYXMgaGludHMKJSBvZiBwcm9ibGVtIGluIHdoaWNoIHN0dWRlbnQgcmVxdWVzdGVkIGhpbnRzIHdoZW4gaGludHMgYXJlIGF2YWlsYWJsZQpBdmVyYWdlICMgc2NhZmZvbGRpbmcKQXZlcmFnZSB0aW1lIG9mIGZpcnN0IHJlc3BvbnNlCiUgYm90dG9tIG91dCBvdXQgb2YgcXVlc3Rpb25zIHdpdGggaGludHMKQXZlcmFnZSBoaXN0b3JpY2FsIGF0dGVtcHQgY291bnQKCmkuIFByZWRpY3Rpbmcgc3R1ZGVudHMnIHVzaW5nIGhpbnRzL3NjYWZmb2xkaW5nIC0tIGFsbCBkYXRhCmlpLiBQcmVkaWN0IHN0dWRlbnQgYm90dG9tIG91dCBiZWhhdmlvciAtLSBhbGwgZGF0YQppaWkuIFByZWRpY3QgY29ycmVjdCBpbmNvcnJlY3QgLS0gbm8gaGludHMvc2NhZmZvbGRpbmcKCkZvciBlYWNoIHdlIGNob29zZSBiZXR3ZWVuIDIgbW9kZWxzIChsb2dpc3RpYyByZWdyZXNzaW9uIGFuZCByYW5kb20gZm9yZXN0KQogIGF1YwogIApmZWF0dXJlIHNlbGVjdGlvbiAtIGZvcndhcmQgc3RlcHdpc2Ugc2VsZWN0aW9uCgoKCgpgYGB7cn0KI1B1bGxpbmcgZGF0YQpyYXdkYXRhIDwtIHJlYWQuY3N2KCJza2lsbF9idWlsZGVyX2RhdGEuY3N2IikKCiMKCmBgYAo=</div>
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiTURNTF9GaWFubF9Qcm9qZWN0X1lKX0ZUX09DIgpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sKYXV0aG9yOiBZZW9uamkgSnVuZywgRnJhbmtpZSBUYW0sIE9mZXIgQ2hlbgotLS0KI0Rlc2NyaXB0aW9uCgojI0JBQ0tHUk9VTkQKSGludHMgYXJlIGFuIGltcG9ydGFudCBsZWFybmluZyBhaWQuIEJ1dCBzdHVkZW50cyBtYXkgaGF2ZSBhIHRlbmRlbmN5IHRvIHVzZSBoaW50cyBpbmFwcHJvcHJpYXRlbHkuIApPZmZlcmluZyBoaW50cyBpbmRpc2NyaW1pbmF0ZWx5IGNhbiByZXN1bHQgaW4gcG9vciBsZWFybmluZyBwZXJmb3JtYW5jZS4gQSBwcmVkaWN0aW9uIG1vZGVsIG9uIHN0dWRlbnQgaGludC10YWtpbmcgYmVoYXZpb3JzIGNhbiBiZSB1c2VkIHRvIG1ha2UgYWRhcHRpdmUgZGVjaXNpb25zIG9uIHdoZXRoZXIgdG8gd2l0aGhvbGQgb3IgcHJvdmlkZSBoaW50cy4gU3VjaCBtb2RlbCBjYW4gYmUgdXNlZnVsIGZvciB0ZWFjaGVycyB0cnlpbmcgZGVjaWRlIHdoZXRoZXIgdG8gc2hvdyBhIGhpbnQgb3Igc2NhZmZvbGRpbmcgdG8gc3R1ZGVudHMgaW4gdGhlIGZ1cnRoZXIgaXRlcmF0aW9ucy4KCiMjREFUQSAKVGhlIGRhdGFzZXQgaXMgdGFrZW4gZnJvbSB0aGUgQVNTSVNUbWVudHMnIHNraWxsIGJ1aWxkZXIgcHJvYmxlbS4gVGhlIGRhdGEgc2V0IHdhcyBnYXRoZXJlZCBpbiB0aGUgc2Nob29sIHllYXIgMjAwOS8xMC4gCkFTU0lTVG1lbnRzIGlzIGFuIG9ubGluZSB0dXRvcmluZyBzeXN0ZW0gdGhhdCB0ZWFjaGVycyBjYW4gdXNlIHRvIHRlYWNoIG1pZGRsZS1zY2hvb2wgbGV2ZWwgTWF0aGVtYXRpY3MgYW5kIGlkZW50aWZ5IHN0dWRlbnQgYWN0aXZpdGllcyBzb2x2aW5nIGV4ZXJjaXNlcyBvbiB0aGUgc3lzdGVtLiAKClRoZSBkYXRhc2V0IGNvbnNpc3RzIG9mIGxvZyBkYXRhIG9mIHN0dWRlbnQgYWN0aXZpdGllcyBpbmNsdWRpbmcgdGhlIGNocm9ub2xvZ2ljYWwgb3JkZXIgb2YgYXR0ZW1wdHMgKG9yZGVyX2lkKSwgYXNzaWdubWVudCBpZCwgcHJvYmxlbSBpZCwgdXNlciBpZCwgd2hldGhlciB0aGUgZmlyc3QgYXR0ZW1wdCBpcyBjb3JyZWN0IChjb3JyZWN0KSwgd2hldGhlciB0aGUgbnVtYmVyIG9mIGF0dGVtcHRzIG9uIHRoZSBwcm9ibGVtIChhdHRlbXB0X2NvdW50KSwgdGhlIG51bWJlciBvZiB1c2luZyBoaW50cyBvbiB0aGUgcHJvYmxlbSAoaGludF9jb3VudCksIHdoZXRoZXIgb3Igbm90IHRoZSBzdHVkZW50IGFza3MgZm9yIGFsbCBoaW50cyAoYm90dG9tX2hpbnQpLCB0aGUgdGltZSBpbiBtaWxsaXNlY29uZHMgZm9yIHRoZSBzdHVkZW50IHRvIGNvbXBsZXRlIHRoZSBwcm9ibGVtIChvdmVybGFwX3RpbWUpLCB0aW1lIGJldHdlZW4gc3RhcnQgdGltZSBhbmQgZmlyc3Qgc3R1ZGVudCBhY3Rpb24gKGZpcnN0X3Jlc3BvbnNlX3RpbWUpLCB3aGV0aGVyIHRoZSBmaXJzdCBhY3Rpb24gaXMgYXR0ZW1wdCwgdXNpbmcgaGludCwgb3IgdXNpbmcgc2NhZmZvbGRpbmcgKGZpcnN0X2FjdGlvbikuIEVhY2ggcm93IHJlcHJlc2VudHMgYSBzaW5nbGUgcHJvYmxlbSBvZiBlYWNoIHN0dWRlbnQuCgpUaGUgZGF0YXNldCBoYXMgdGhlIGZvbGxvd2luZyBmZWF0dXJlczoKKGEpIFF1ZXN0aW9ucyBhcmUgYmFzZWQgb24gb25lIHNwZWNpZmljIHNraWxsLCBhIHF1ZXN0aW9uIGNhbiBoYXZlIG11bHRpcGxlIHNraWxsIHRhZ2dpbmdzIAooYikgU3R1ZGVudHMgbXVzdCBhbnN3ZXIgdGhyZWUgcXVlc3Rpb25zIGNvcnJlY3QgaW4gYSByb3cgdG8gY29tcGxldGUgdGhlIGFzc2lnbm1lbnQKKGMpIElmIGEgc3R1ZGVudCB1c2VzIHRoZSB0dXRvcmluZyBhaWRzICgiaGludCIgb3IgInNjYWZmb2xkaW5nIiksIHRoZSBxdWVzdGlvbiB3aWxsIGJlIG1hcmtlZCBpbmNvcnJlY3QKKGQpIFN0dWRlbnRzIHdpbGwga25vdyBpbW1lZGlhdGVseSBpZiB0aGV5IGFuc3dlcmVkIHRoZSBxdWVzdGlvbiBjb3JyZWN0bHkKKGUpIFRoZSBzY2FmZm9sZGluZyBvcHRpb24gd2lsbCBwcm92aWRlIHRoZSBzdHVkZW50IGEgYnJlYWstZG93biBvZiB0aGUgcHJvYmxlbSBpbnRvIHNtYWxsIHN0ZXBzCihmKSBUaGUgYm90dG9tIG91dCBoaW50IGlzIHRoZSBsYXN0IGhpbnQgZm9yIGEgcHJvYmxlbSBhbmQgd2lsbCBnZW5lcmFsbHkgY29udGFpbiB0aGUgcHJvYmxlbeKAmXMgYW5zd2VyCgpUaGUgcmF3IGRhdGFzZXQgaXMgYXZhaWxhYmxlIGF0OgpodHRwczovL3NpdGVzLmdvb2dsZS5jb20vc2l0ZS9hc3Npc3RtZW50c2RhdGEvaG9tZS9hc3Npc3RtZW50LTIwMDktMjAxMC1kYXRhL3NraWxsLWJ1aWxkZXItZGF0YS0yMDA5LTIwMTAKCiMjUFVSUE9TRQpCdWlsZGluZyBhIHByZWRpY3Rpb24gbW9kZWwgb24gc3R1ZGVudCBhY3Rpb25zIG9uIG5leHQgcXVlc3Rpb24sIHBvc3NpYmxlIG9wdGlvbnMgYXJlOgooYSkgd2hldGhlciBzdHVkZW50cyB3aWxsIHRha2UgYSBoaW50IGF0IGZpcnN0IGF0dGVtcHQgKGZpcnN0X2FjdGlvbikKKGIpIHdoZXRoZXIgc3R1ZGVudHMgd2lsbCB0YWtlIGEgYm90dG9tLW91dCBoaW50IChib3R0b21faGludCkKKGMpIHdoZXRoZXIgc3R1ZGVudHMgd2lsbCBhbnN3ZXIgY29ycmVjdGx5IHdpdGhvdXQgaGludHMgKGNvcnJlY3QpCgojI0FQUFJPQUNIIApXZSdsbCBidWlsZCB0aHJlZSBkaWZmZXJlbnQgbW9kZWxzIHByZWRpY3Rpbmcgc3R1ZGVudCBhY3Rpb25zIG9uIG5leHQgcXVlc3Rpb246IChhKSBoaW50LXRha2luZywgKGIpIGJvdHRvbS1vdXQgaGludC10YWtpbmcsIChjKSBjb3JyZWN0IGFuc3dlcnMuIEZvciBlYWNoIHBhcnQsIHdlIHNlbGVjdCBmZWF0dWVycywgc3BsaXQgdHJhaW4gYW5kIHRlc3Qgc2V0LCBmaXQgdHdvIG1vZGVscyBvZiBsb2dpc3RpYyByZWdyZXNzaW9uIGFuZCByYW5kb20gZm9yZXN0LCB0ZXN0IGl0IHdpdGggdGVzdCBkYXRhc2V0LCBhbmQgY2hvb3NlIGJldHdlZW4gMiBtb2RlbHMgY2FsY3VsYXRpbmcgQVVDLiAod2h5IHlvdSB0aGluayB0aGlzIGlzIGEgcmVhc29uYWJsZSBhcHByb2FjaCB0byB0YWtlKS4gCgoKI1BhcnQgQTogSW1wb3J0IGFuZCBDbGVhbiB0aGUgRGF0YQojI0ltcG9ydCBwYWNrYWdlcyBhbmQgZGF0YQpgYGB7cn0KI2xvYWQgcGFja2FnZXMKbGlicmFyeSh0aWR5dmVyc2UpCmxpYnJhcnkocmFuZG9tRm9yZXN0KQpsaWJyYXJ5KGRvUGFyYWxsZWwpCmxpYnJhcnkoZm9yZWFjaCkKbGlicmFyeShjYXIpCmxpYnJhcnkoUk9DUikKCiNpbXBvcnQgdGhlIGRhdGEKZGZfcmF3IDwtIHJlYWQuY3N2KCJza2lsbF9idWlsZGVyX2RhdGEuY3N2IikKYGBgCgojI0NsZWFuIHRoZSBkYXRhCmBgYHtyfQojZmlsdGVyIHRoZSBmb2xsb3dpbmcgdmFsdWVzCiMjKCJvcmlnaW5hbCIpIHNjYWZmb2xkaW5nIHByb2JsZW1zICgwKTsgdGhpcyBpcyBub3QgcmVsZXZhbnQgdG8gdGhpcyBwcm9qZWN0CiMjKCJmaXJzdF9hY3Rpb24iKSBlbXB0eSB2YWx1ZXM7IHN0dWRlbnQgY2xpY2tlZCBvbiB0aGUgcHJvYmxlbSBidXQgZGlkIG5vdGhpbmcgZWxzZQojIygiZmlyc3RfYWN0aW9uIikgc2NhZmZvbGRpbmcgdmFsdWVzOyBzY2FmZm9sZGluZyBvcHBvcnR1bml0aWVzIHZhcmllZCBhY3Jvc3MgcHJvYmxlbSBzZXRzCiMjKCJhbnN3ZXJfdHlwZSIpIG9wZW5fcmVzcG9uc2U7IHRoaXMgdHlwZSBvZiBhbnN3ZXJzIGFsd2F5cyBtYXJrZWQgY29ycmVjdAojIygibXNfZmlyc3RfcmVzcG9uc2UiKSBuZWdhdGl2ZSB2YWx1ZXMgYW5kIHplcm8KIyMoIm92ZXJsYXBfdGltZSIpIG5lZ2F0aXZlIHZhbHVlcyBhbmQgemVybwoKZGZfY2xlYW4gPC0gZGZfcmF3ICU+JSAKICBmaWx0ZXIob3JpZ2luYWw9PTEsIGZpcnN0X2FjdGlvbiE9MiwgIWlzLm5hKGZpcnN0X2FjdGlvbiksIAogICAgICAgICBhbnN3ZXJfdHlwZSE9Im9wZW5fcmVzcG9uc2UiLCBtc19maXJzdF9yZXNwb25zZSA+IDAsIG92ZXJsYXBfdGltZSA+IDApICU+JQogIHJlbmFtZShwcm9ibGVtX3R5cGUgPSB0eXBlKQoKI3JldmFsdWUgdGhlIGZvbGxvd2luZyBjb2x1bW5zOgojIygiYm90dG9tX2hpbnQiKSByZXBsYWNlIGVtcHR5IHZhbHVlcyBpbnRvIDA7IGl0IG1lYW5zIHRoZSBzdHVkZW50IGRpZCBub3QgYXNrIGZvciBhIGhpbnQKZGZfY2xlYW4kYm90dG9tX2hpbnRbaXMubmEoZGZfY2xlYW4kYm90dG9tX2hpbnQpXSA8LSAwCmBgYAoKI1BhcnQgQjogSGludC1UYWtpbmcgUHJlZGljdGlvbgojI0ZlYXR1cmUgZW5naW5lZXJpbmc7IG1ha2UgaGlzdG9yaWNhbCBmZWF0dXJlcwpgYGB7cn0KI3VzZSB0aGUgbGF0ZXN0IG9yZGVyIGlkIGFzIHJlZmVyZW5jZQpkZl9sYXN0IDwtIGRmX2NsZWFuICU+JSBncm91cF9ieSh1c2VyX2lkKSAlPiUgYXJyYW5nZShvcmRlcl9pZCkgJT4lIHNsaWNlKG4oKSkKCmRmX2hpc3QgPC0gbWVyZ2UoZGZfbGFzdCwgZGZfY2xlYW5bYygndXNlcl9pZCcsICdvcmRlcl9pZCcsICdwcm9ibGVtX2lkJywgJ2NvcnJlY3QnLCAnaGludF9jb3VudCcsICdoaW50X3RvdGFsJywgJ2JvdHRvbV9oaW50JywgJ21zX2ZpcnN0X3Jlc3BvbnNlJywgJ2F0dGVtcHRfY291bnQnKV0sIGJ5ID0gJ3VzZXJfaWQnLCBhbGwueCA9IFRSVUUsIGFsbG93LmNhcnRlc2lhbj1UUlVFKQoKZGZfaGlzdCA8LSBkZl9oaXN0ICU+JSBmaWx0ZXIob3JkZXJfaWQueSA8IG9yZGVyX2lkLngpCgpkZl9oaXN0IDwtIGRmX2hpc3QgJT4lIGdyb3VwX2J5KHVzZXJfaWQsIG9yZGVyX2lkLngpICU+JSAKICBzdW1tYXJpc2UocHJldl90b3RhbF9jb3JyZWN0ID0gc3VtKGNvcnJlY3QueSksCiAgICAgICAgICAgIHByZXZfbnVtX3Byb2JsZW0gPSBsZW5ndGgodW5pcXVlKHByb2JsZW1faWQueSkpLAogICAgICAgICAgICBwcmV2X3BlcmNlbnRfY29ycmVjdD1wcmV2X3RvdGFsX2NvcnJlY3QvcHJldl9udW1fcHJvYmxlbSwKICAgICAgICAgICAgcHJldl9xdWVzdGlvbnNfd2l0aF9oaW50cyA9IHN1bShoaW50X3RvdGFsLnk+MCksCiAgICAgICAgICAgIHByZXZfdG90YWxfaGludHMgPSBzdW0oaGludF90b3RhbC55KSwKICAgICAgICAgICAgcHJldl9hdmdfaGludHNfcGVyX3Byb2JsZW0gPSBwcmV2X3RvdGFsX2hpbnRzL3ByZXZfcXVlc3Rpb25zX3dpdGhfaGludHMsCiAgICAgICAgICAgIHByZXZfcHJvYmxlbV9yZXF1ZXN0ZWRfaGludCA9IHN1bShoaW50X2NvdW50Lnk+MCksCiAgICAgICAgICAgIHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ID0gcHJldl9wcm9ibGVtX3JlcXVlc3RlZF9oaW50L3ByZXZfbnVtX3Byb2JsZW0sCiAgICAgICAgICAgIHByZXZfYXZnX3Jlc3BvbnNlX3RpbWUgPSBtZWFuKG1zX2ZpcnN0X3Jlc3BvbnNlLnkpLAogICAgICAgICAgICBwcmV2X3RvdGFsX2JvdHRvbV9oaW50ID0gc3VtKGJvdHRvbV9oaW50LnkgPT0gMSksCiAgICAgICAgICAgIHByZXZfcGVyY2VudF9ib3R0b21faGludCA9IHByZXZfdG90YWxfYm90dG9tX2hpbnQvcHJldl9xdWVzdGlvbnNfd2l0aF9oaW50cywKICAgICAgICAgICAgcHJldl9hdmdfYXR0ZW1wdF9jb3VudCA9IG1lYW4oYXR0ZW1wdF9jb3VudC55KSkgCgpkZl9oaXN0IDwtIHJlcGxhY2UoZGZfaGlzdCwgaXMubmEoZGZfaGlzdCksIDApCgpkZl9maW4gPC0gIGRmX2NsZWFuICU+JSBsZWZ0X2pvaW4oZGZfaGlzdCkKCiNjb252ZXJ0IHRvIGZhY3RvcnMKZGZfZmluIDwtIGRmX2ZpbiAlPiUKICBtdXRhdGVfYXQodmFycyhmaXJzdF9hY3Rpb24sY29ycmVjdCxib3R0b21faGludCxwcm9ibGVtX2lkLHRlYWNoZXJfaWQsIHNjaG9vbF9pZCksZnVucyhhcy5mYWN0b3IpKQpgYGAKCiMjQ3JlYXRlIGEgdHJhaW5pbmcgU2V0IC8gdGVzdCBTZXQKYGBge3J9CiNyYW5kb21seSBzaHVmZmxlIHRoZSBkYXRhCnNldC5zZWVkKDEzMTQpCmRmX2ZpbiA8LSBkZl9maW4gJT4lIHNsaWNlKHNhbXBsZSgxOm4oKSkpCgojY3JlYXRlIHRyYWluX2hhbGYgYW5kIHRlc3RfaGFsZgpzcGxpdHNpemUgPSBmbG9vcihucm93KGRmX2ZpbikvMikKdHJhaW4gPC0gZGZfZmluICU+JSBzbGljZSgxOnNwbGl0c2l6ZSkKdGVzdCA8LSBkZl9maW4gJT4lIHNsaWNlKHNwbGl0c2l6ZSsxOm4oKSkKYGBgCgojI0ZpdCBhIGxvZ2lzdGljIG1vZGVsIG9uIHRyYWluIGFuZCBjb21wdXRlIEFVQyBvbiB0ZXN0IHNldApgYGB7cn0KI2ZpdCBhIHJhbmRvbSBmb3Jlc3QgbW9kZWwgb24gdHJhaW4KbGdfaGludCA8LSBnbG0oZmlyc3RfYWN0aW9uIH4gdHV0b3JfbW9kZSArIGFuc3dlcl90eXBlICsgcHJldl90b3RhbF9jb3JyZWN0ICsgCiAgICAgICAgICAgICAgICAgcHJldl9wZXJjZW50X2NvcnJlY3QgKyBwcmV2X3Byb2JsZW1fcmVxdWVzdGVkX2hpbnQgKyAKICAgICAgICAgICAgICAgICBwcmV2X3BlcmNlbnRfcHJvYmxlbV9yZXF1ZXN0ZWRfaGludCArIHByZXZfYXZnX3Jlc3BvbnNlX3RpbWUgKyAKICAgICAgICAgICAgICAgICBwcmV2X3RvdGFsX2JvdHRvbV9oaW50ICsgcHJldl9wZXJjZW50X2JvdHRvbV9vdXQgKyBwcmV2X2F2Z19hdHRlbXB0X2NvdW50LCAKICAgICAgICAgICAgICAgZGF0YT10cmFpbiwgZmFtaWx5PSJiaW5vbWlhbCIpCgojY29tcHV0ZSBBVUMgb2YgdGhpcyBtb2RlbCBvbiB0aGUgdGVzdCBkYXRhc2V0ICAKdGVzdCRsZy5oaW50LnByZWQucHJvYiA8LSBwcmVkaWN0KGxnX2hpbnQsbmV3ZGF0YT10ZXN0LHR5cGU9J3Jlc3BvbnNlJykKdGVzdC5sZy5oaW50LnByZWQgPC0gcHJlZGljdGlvbih0ZXN0JGxnLmhpbnQucHJlZC5wcm9iLCB0ZXN0JGZpcnN0X2FjdGlvbikKdGVzdC5sZy5oaW50LnBlcmYgPC0gcGVyZm9ybWFuY2UodGVzdC5sZy5oaW50LnByZWQsICJhdWMiKQpjYXQoJ3RoZSBhdWMgc2NvcmUgaXMgJywgMTAwKnRlc3QubGcuaGludC5wZXJmQHkudmFsdWVzW1sxXV0sICJcbiIpICAKCiNjYWxjdWxhdGUgdGhlIGZpdmUgc21hbGxlc3QgYW5kIGZpdmUgbGFyZ2VzdCBjb2VmZmljaWVudHMgCmxnX2hpbnRfY29lZiA8LSBzdW1tYXJ5KGxnX2hpbnQpW1siY29lZmZpY2llbnRzIl1dCmxnX2hpbnRfY29lZltvcmRlcihsZ19oaW50X2NvZWZbICwgMV0pLCBdICAgCmBgYApCZWZvcmUgZml0dGluZyBhIG1vZGVsLCBJIGRyb3BwZWQgc29tZSBmZWF0dXJlcyAod2hpY2ggSSBob3BlZCB0byBlbWJlZCBpbiB0aGUgbW9kZWwpOyAKICBwcm9ibGVtX3R5cGUgPSBvbmx5IDEgZmFjdG9yIAogIHByb2JsZW1faWQgPSBtb3JlIHRoYW4gNTMgZmFjdG9ycwogIHRlYWNoZXJfaWQgPSBtb3JlIHRoYW4gNTMgZmFjdG9ycwogIApUaGUgQVVDIG9mIHRoZSBsb2dpc3RpYyBtb2RlbCBwcmVkaWN0aW5nIGhpbnQtdGFraW5nIG9uIHRoZSB0ZXN0IGRhdGFzZXQgaXMgODQuMjAzMgoKVGhlIGZpdmUgc21hbGxlc3QgYW5kIGZpdmUgbGFyZ2VzdCBjb2VmZmljaWVudHMgaW4gdGhpcyBtb2RlbAogIFNtYWxsZXN0OiBhbnN3ZXJfdHlwZWNob29zZV8xIDwgYW5zd2VyX3R5cGVjaG9vc2VfbiA8IHByZXZfcGVyY2VudF9jb3JyZWN0IDwKICAgICAgICAgICAgcHJldl90b3RhbF9ib3R0b21faGludCA8IHByZXZfdG90YWxfY29ycmVjdCAKICBMYXJnZXN0OiAgdHV0b3JfbW9kZXR1dG9yID4gcHJldl9wZXJjZW50X2JvdHRvbV9oaW50ID4gYW5zd2VyX3R5cGVmaWxsX2luXzEgPiAKICAgICAgICAgICAgcHJldl9wZXJjZW50X3Byb2JsZW1fcmVxdWVzdGVkX2hpbnQgPiBwcmV2X3Byb2JsZW1fcmVxdWVzdGVkX2hpbnQgCiAgClRoZSBmZWF0dXJlcyB3ZSBkZWNpZGVkIHRvIGRyb3A6IAogIChhKSBwcmV2X3Byb2JsZW1fcmVxdWVzdGVkX2hpbnQsIChiKSBwcmV2X3BlcmNlbnRfY29ycmVjdCwgKGMpIHByZXZfdG90YWxfYm90dG9tX2hpbnQKICBUaGVzZSBmZWF0dXJlcyBhcmUgc29tZXdoYXQgc2ltaWxhciBpbiBjb250ZW50IHJlc3BlY3RpdmVseSB3aXRoIAogIChhMSkgcHJldl9wZXJjZW50X3Byb2JsZW1fcmVxdWVzdGVkX2hpbnQsIChiMSkgcHJldl90b3RhbF9jb3JyZWN0LCBhbmQgKGMxKSBwcmV2X3BlcmNlbnRfYm90dG9tX2hpbnQsIAogIGFuZCBlYWNoIGhhZCByZWxhdGl2ZWx5IGxvdyBjb2VmZmljaWVudCB0aGFuIGl0cyBjb21wYXJlZCBmZWF0dXJlLiAKICAKIyNEcm9wIHRoZSBwcmVkaWN0b3JzIGFuZCByZWZpdCB0aGUgbG9naXN0aWMgbW9kZWwgCmBgYHtyfQojcmVmaXQgYSByYW5kb20gZm9yZXN0IG1vZGVsIG9uIHRyYWluCnJlX2xnX2hpbnQgPC0gZ2xtKGZpcnN0X2FjdGlvbiB+IHR1dG9yX21vZGUgKyBhbnN3ZXJfdHlwZSArIHByZXZfdG90YWxfY29ycmVjdCArIAogICAgICAgICAgICAgICAgIHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ICsgcHJldl9hdmdfcmVzcG9uc2VfdGltZSArIAogICAgICAgICAgICAgICAgIHByZXZfcGVyY2VudF9ib3R0b21fb3V0ICsgcHJldl9hdmdfYXR0ZW1wdF9jb3VudCwgCiAgICAgICAgICAgICAgIGRhdGE9dHJhaW4sIGZhbWlseT0iYmlub21pYWwiKQoKI2NvbXB1dGUgQVVDIG9mIHRoaXMgbW9kZWwgb24gdGhlIHRlc3QgZGF0YXNldCAgCnRlc3QkcmUubGcuaGludC5wcmVkLnByb2IgPC0gcHJlZGljdChyZV9sZ19oaW50LG5ld2RhdGE9dGVzdCx0eXBlPSdyZXNwb25zZScpCnRlc3QucmUubGcuaGludC5wcmVkIDwtIHByZWRpY3Rpb24odGVzdCRyZS5sZy5oaW50LnByZWQucHJvYiwgdGVzdCRmaXJzdF9hY3Rpb24pCnRlc3QucmUubGcuaGludC5wZXJmIDwtIHBlcmZvcm1hbmNlKHRlc3QucmUubGcuaGludC5wcmVkLCAiYXVjIikKY2F0KCd0aGUgYXVjIHNjb3JlIGlzICcsIDEwMCp0ZXN0LnJlLmxnLmhpbnQucGVyZkB5LnZhbHVlc1tbMV1dLCAiXG4iKSAgCgojY2FsY3VsYXRlIHRoZSBmaXZlIHNtYWxsZXN0IGFuZCBmaXZlIGxhcmdlc3QgY29lZmZpY2llbnRzIApyZV9sZ19oaW50X2NvZWYgPC0gc3VtbWFyeShyZV9sZ19oaW50KVtbImNvZWZmaWNpZW50cyJdXQpyZV9sZ19oaW50X2NvZWZbb3JkZXIocmVfbGdfaGludF9jb2VmWyAsIDFdKSwgXSAgIApgYGAKClRoZSBBVUMgb2YgdGhlIGxvZ2lzdGljIG1vZGVsIHByZWRpY3RpbmcgaGludC10YWtpbmcgb24gdGhlIHRlc3QgZGF0YXNldCBpcyA4Mi44NDI2OSAoKmRlY3JlYXNlZCBmcm9tIDg0LjIpCgpUaGUgc21hbGxlc3QgYW5kIGZpdmUgbGFyZ2VzdCBjb2VmZmljaWVudHMgaW4gdGhpcyBtb2RlbAogIFNtYWxsZXN0OiBhbnN3ZXJfdHlwZWNob29zZV8xIDwgYW5zd2VyX3R5cGVjaG9vc2VfbiA8IHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50IDwgCiAgICAgICAgICAgIHByZXZfdG90YWxfY29ycmVjdCAKICBMYXJnZXN0OiAgdHV0b3JfbW9kZXR1dG9yID4gcHJldl9wZXJjZW50X2JvdHRvbV9oaW50ID4gYW5zd2VyX3R5cGVmaWxsX2luXzEgPiAKICAgICAgICAgICAgcHJldl9hdmdfYXR0ZW1wdF9jb3VudCA+IHByZXZfYXZnX3Jlc3BvbnNlX3RpbWUKICAgICAgICAgICAgCiMjIyBNYXliZSBhZGQgc29tZSBleHBsYW5hdGlvbiBhcyB0byB3aHkgd2UgZGVjaWRlZCB0byBzdGF5IHdpdGhvdXQgdGhlIDMgdmFyaWFibGVzIGRyb3BwZWQgaWYgdGhlIEFVQyBzY29yZSBpcyBsb3dlcj8gbWF5YmUgZm9yIGVhc2llciBpbnRlcnByZXRhYmlsaXR5PwogICAgICAgICAgICAKYGBge3J9CiNmaXQgYSByYW5kb20gZm9yZXN0IG1vZGVsIG9uIHRyYWluCnJmX2hpbnQgPC0gcmFuZG9tRm9yZXN0KGZpcnN0X2FjdGlvbiB+IHR1dG9yX21vZGUgKyBhbnN3ZXJfdHlwZSArIHByZXZfdG90YWxfY29ycmVjdCArIAogICAgICAgICAgICAgICAgIHByZXZfcGVyY2VudF9wcm9ibGVtX3JlcXVlc3RlZF9oaW50ICsgcHJldl9hdmdfcmVzcG9uc2VfdGltZSArIAogICAgICAgICAgICAgICAgIHByZXZfcGVyY2VudF9ib3R0b21fb3V0ICsgcHJldl9hdmdfYXR0ZW1wdF9jb3VudCwgZGF0YT10cmFpbiwgbnRyZWU9MjAwLCAKICAgICAgICAgICAgICAgICBuYS5hY3Rpb249bmEub21pdCkKCiNjb21wdXRlIEFVQyBvZiB0aGlzIG1vZGVsIG9uIHRoZSB0ZXN0IGRhdGFzZXQgIAp0ZXN0JHJmLmhpbnQucHJlZC5wcm9iIDwtIHByZWRpY3QocmZfaGludCxuZXdkYXRhPXRlc3QsdHlwZT0ncHJvYicpWywyXQp0ZXN0LnJmLmhpbnQucHJlZCA8LSBwcmVkaWN0aW9uKHRlc3QkcmYuaGludC5wcmVkLnByb2IsIHRlc3QkZmlyc3RfYWN0aW9uKQp0ZXN0LnJmLmhpbnQucGVyZiA8LSBwZXJmb3JtYW5jZSh0ZXN0LnJmLmhpbnQucHJlZCwgImF1YyIpCmNhdCgndGhlIGF1YyBzY29yZSBpcyAnLCAxMDAqdGVzdC5yZi5oaW50LnBlcmZAeS52YWx1ZXNbWzFdXSwgIlxuIikgCmBgYAoKVGhlIGNvbXB1dGVkIGF1YyBzY29yZSBpcyA3MC4yMDUxMS4gKkhvdyBkb2VzIHRoZSBBVUMgb2YgdGhlIHJhbmRvbSBmb3Jlc3QgY29tcGFyZSB3aXRoIHRoZSBBVUMgb2YgdGhlIGxvZ2lzdGljIHJlZ3Jlc3Npb24gbW9kZWw/CgpgYGB7cn0KI2NvbXBhcmVzIHRoZSBwZXJmb3JtYW5jZSBvZiB0d28gbW9kZWxzIHVzaW5nIHRoZSBwbG90cwojI2NyZWF0ZSBhIHBlcmZvcm1hbmNlIHBsb3QKdGVzdC4xIDwtIHRlc3QgJT4lIG11dGF0ZShmaXJzdF9hY3Rpb24gPSBhcy5pbnRlZ2VyKGZpcnN0X2FjdGlvbiktMSkKcGxvdC5kYXRhLnJmIDwtIHRlc3QuMSAlPiUgYXJyYW5nZShkZXNjKHJmLmhpbnQucHJlZC5wcm9iKSkgJT4lIAogIG11dGF0ZShudW1yYW5rID0gcm93X251bWJlcigpLCBwZXJjZW50LmZpcnN0LmFjdGlvbiA9IGN1bXN1bShmaXJzdF9hY3Rpb24pL251bXJhbmssCiAgICAgICAgIG1ldGhvZCA9IHJlcCgiUmFuZG9tIEZvcmVzdCIsbigpKSkgJT4lIAogIHNlbGVjdChudW1yYW5rLCBwZXJjZW50LmZpcnN0LmFjdGlvbiwgbWV0aG9kKQoKcGxvdC5kYXRhLmxtIDwtIHRlc3QuMSAlPiUgYXJyYW5nZShkZXNjKHJlLmxnLmhpbnQucHJlZC5wcm9iKSkgJT4lIAogIG11dGF0ZShudW1yYW5rID0gcm93X251bWJlcigpLCBwZXJjZW50LmZpcnN0LmFjdGlvbiA9IGN1bXN1bShmaXJzdF9hY3Rpb24pL251bXJhbmssCiAgICAgICAgIG1ldGhvZCA9IHJlcCgiTG9naXN0aWMgUmVncmVzc2lvbiIsbigpKSkgJT4lIAogIHNlbGVjdChudW1yYW5rLCBwZXJjZW50LmZpcnN0LmFjdGlvbixtZXRob2QpCgpwbG90LmRhdGEgPC0gYmluZF9yb3dzKHBsb3QuZGF0YS5yZixwbG90LmRhdGEubG0pCgojI2NyZWF0ZSBwbG90CnRoZW1lX3NldCh0aGVtZV9idygpKQpwIDwtIGdncGxvdChkYXRhPXBsb3QuZGF0YSwgYWVzKHg9bnVtcmFuaywgeT1wZXJjZW50LmZpcnN0LmFjdGlvbiwgY29sID0gbWV0aG9kKSkgCnAgPC0gcCArIGdlb21fbGluZSgpCnAgPC0gcCArIHhsYWIoJ051bWJlciBvZiBBdHRlbXB0cycpICsgeGxpbSgxLDEwMDApCnAgPC0gcCArIHNjYWxlX3lfY29udGludW91cygiUGVyY2VudCBvZiBBdHRlbXB0cyB3aXRoIEhpbnQiLCBsaW1pdHM9YygwLjUsMSksIGxhYmVscz1zY2FsZXM6OnBlcmNlbnQpCnAKYGBgCgpPdmVyYWxsLCBsb2dpc3RpYyByZWdyZXNzaW9uIHNob3dzIGEgYmV0dGVyIHBlcmZvcm1hbmNlIHRoYW4gdGhhdCBvZiB0aGUgcmFuZG9tIGZvcmVzdCBtb2RlbC4KCiMgUGFydCBDOiBCb3R0b20tdXAtSGludC1UYWtpbmcgUHJlZGljdGlvbgpgYGB7cn0KCmBgYAoKCiMgUGFydCBEOiBIaW50LVRha2luZyBQcmVkaWN0aW9uCmBgYHtyfQoKYGBgCgoKCiMgUGFydCAjOiBTY2FmZm9sZGluZy1UYWtpbmcgUHJlZGljdGlvbgoqKiBSaWdodCBub3csIEkgZG9uJ3Qgd2FudCB0byBwcmVkaWN0IHNjYWZmb2xkaW5nLiBUaGlzIGlzIHRvbyBjb21wbGljYXRlZCB0byBjb25zaWRlciBzaW5jZSBpZiBhIHByb2JsZW0gaGFzIHNjYWZmb2xkaW5nIGFuZCB0aGUgc3R1ZGVudCBhbnN3ZXJzIGluY29ycmVjdGx5IG9yIGFza3MgZm9yIHRoZSBwcm9ibGVtIHRvIGJlIGJyb2tlbiBpbnRvIHN0ZXBzLCBhIG5ldyBwcm9ibGVtIHdpbGwgYmUgY3JlYXRlZCBjYWxsZWQgYSBzY2FmZm9sZGluZyBwcm9ibGVtLiBMTUsK</div>
 
 
 
