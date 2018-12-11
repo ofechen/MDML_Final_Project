@@ -46,7 +46,6 @@ library(doParallel)
 library(foreach)
 library(car)
 library(ROCR)
-library(leaps)
 
 #import the data
 df_raw <- read.csv("skill_builder_data.csv")
@@ -100,6 +99,8 @@ df_hist <- replace(df_hist, is.na(df_hist), 0)
 
 df_fin <-  df_clean %>% left_join(df_hist)
 
+# Maybe we should consider combining all skill ids in one variable and skill names in another
+
 #convert to factors
 df_fin <- df_fin %>%
   mutate_at(vars(first_action,correct,bottom_hint,problem_id,teacher_id, school_id),funs(as.factor))
@@ -119,22 +120,24 @@ test <- df_fin %>% slice(splitsize+1:n())
 
 ##Fit a logistic model on train and compute AUC on test set
 ```{r}
-#fit a logistic regression model on train
+#fit a random forest model on train
 lg_hint <- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
                  prev_percent_correct + prev_problem_requested_hint + 
                  prev_percent_problem_requested_hint + prev_avg_response_time + 
                  prev_total_bottom_hint + prev_percent_bottom_hint + prev_avg_attempt_count, 
                data=train, family="binomial")
+
 #compute AUC of this model on the test dataset  
 test$lg.hint.pred.prob <- predict(lg_hint,newdata=test,type='response')
 test.lg.hint.pred <- prediction(test$lg.hint.pred.prob, test$first_action)
 test.lg.hint.perf <- performance(test.lg.hint.pred, "auc")
 cat('the auc score is ', 100*test.lg.hint.perf@y.values[[1]], "\n")  
+
 #calculate the five smallest and five largest coefficients 
 lg_hint_coef <- summary(lg_hint)[["coefficients"]]
 lg_hint_coef[order(lg_hint_coef[ , 1]), ]   
 ```
-Before fitting a model, I dropped some features (which I hoped to embed in the model); 
+Before fitting a model, we dropped some features (which we hoped to embed in the model); 
   problem_type = only 1 factor 
   problem_id = more than 53 factors
   teacher_id = more than 53 factors
@@ -145,37 +148,43 @@ The five smallest and five largest coefficients in this model
   Smallest: answer_typechoose_1 < answer_typechoose_n < prev_percent_correct <
             prev_total_bottom_hint < prev_total_correct 
   Largest:  tutor_modetutor > prev_percent_bottom_hint > answer_typefill_in_1 > 
-            prev_percent_problem_requested_hint > prev_problem_requested_hint 
+            prev_percent_problem_requested_hint > prev_problem_requested_hint
+### The mode being tutor is the strongest predictor because no one has taken a hint during a test (I verified that), it seems like students prefer to try answering and not get hints when they know it will be counted as a mistake anyway. Maybe we should drop test questions altogether, it will definitely hurt the prediction but I think the model makes more sense that way.
   
-The features I decided to drop: 
+The features we decided to drop: 
   (a) prev_problem_requested_hint, (b) prev_percent_correct, (c) prev_total_bottom_hint
-  These features had similar in the contents respectively with 
+  These features are somewhat similar in content respectively with 
   (a1) prev_percent_problem_requested_hint, (b1) prev_total_correct, and (c1) prev_percent_bottom_hint, 
   and each had relatively low coefficient than its compared feature. 
   
 ##Drop the predictors and refit the logistic model 
 ```{r}
-#refit a logistic regression model on train
+#refit a random forest model on train
 re_lg_hint <- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
                  prev_percent_problem_requested_hint + prev_avg_response_time + 
                  prev_percent_bottom_hint + prev_avg_attempt_count, 
                data=train, family="binomial")
+
 #compute AUC of this model on the test dataset  
 test$re.lg.hint.pred.prob <- predict(re_lg_hint,newdata=test,type='response')
 test.re.lg.hint.pred <- prediction(test$re.lg.hint.pred.prob, test$first_action)
 test.re.lg.hint.perf <- performance(test.re.lg.hint.pred, "auc")
 cat('the auc score is ', 100*test.re.lg.hint.perf@y.values[[1]], "\n")  
+
 #calculate the five smallest and five largest coefficients 
 re_lg_hint_coef <- summary(re_lg_hint)[["coefficients"]]
 re_lg_hint_coef[order(re_lg_hint_coef[ , 1]), ]   
 ```
 
-The AUC of the logistic model predicting hint-taking on the test dataset is 82.84269 (*decreasing)
+The AUC of the logistic model predicting hint-taking on the test dataset is 82.84269 (*decreased from 84.2)
+
 The smallest and five largest coefficients in this model
   Smallest: answer_typechoose_1 < answer_typechoose_n < prev_percent_problem_requested_hint < 
             prev_total_correct 
   Largest:  tutor_modetutor > prev_percent_bottom_hint > answer_typefill_in_1 > 
             prev_avg_attempt_count > prev_avg_response_time
+            
+### Maybe add some explanation as to why we decided to stay without the 3 variables dropped if the AUC score is lower? maybe for easier interpretability?
             
 ```{r}
 #fit a random forest model on train
@@ -183,13 +192,16 @@ rf_hint <- randomForest(first_action ~ tutor_mode + answer_type + prev_total_cor
                  prev_percent_problem_requested_hint + prev_avg_response_time + 
                  prev_percent_bottom_hint + prev_avg_attempt_count, data=train, ntree=200, 
                  na.action=na.omit)
+
 #compute AUC of this model on the test dataset  
 test$rf.hint.pred.prob <- predict(rf_hint,newdata=test,type='prob')[,2]
 test.rf.hint.pred <- prediction(test$rf.hint.pred.prob, test$first_action)
 test.rf.hint.perf <- performance(test.rf.hint.pred, "auc")
 cat('the auc score is ', 100*test.rf.hint.perf@y.values[[1]], "\n") 
 ```
+
 The computed auc score is 70.20511. *How does the AUC of the random forest compare with the AUC of the logistic regression model?
+
 ```{r}
 #compares the performance of two models using the plots
 ##create a performance plot
@@ -198,11 +210,14 @@ plot.data.rf <- test.1 %>% arrange(desc(rf.hint.pred.prob)) %>%
   mutate(numrank = row_number(), percent.first.action = cumsum(first_action)/numrank,
          method = rep("Random Forest",n())) %>% 
   select(numrank, percent.first.action, method)
+
 plot.data.lm <- test.1 %>% arrange(desc(re.lg.hint.pred.prob)) %>% 
   mutate(numrank = row_number(), percent.first.action = cumsum(first_action)/numrank,
          method = rep("Logistic Regression",n())) %>% 
   select(numrank, percent.first.action,method)
+
 plot.data <- bind_rows(plot.data.rf,plot.data.lm)
+
 ##create plot
 theme_set(theme_bw())
 p <- ggplot(data=plot.data, aes(x=numrank, y=percent.first.action, col = method)) 
@@ -211,169 +226,21 @@ p <- p + xlab('Number of Attempts') + xlim(1,1000)
 p <- p + scale_y_continuous("Percent of Attempts with Hint", limits=c(0.5,1), labels=scales::percent)
 p
 ```
+
 Overall, logistic regression shows a better performance than that of the random forest model.
 
 # Part C: Bottom-up-Hint-Taking Prediction
 ```{r}
-#fit a logistic regression model on train
-lg_bottom_hint <- glm(bottom_hint ~ tutor_mode + answer_type + prev_total_correct +
-                 prev_percent_correct + prev_problem_requested_hint +
-                 prev_percent_problem_requested_hint + prev_avg_response_time +
-                 prev_total_bottom_hint + prev_percent_bottom_hint + prev_avg_attempt_count,
-               data=train, family="binomial")
-
-#compute AUC of this model on the test dataset  
-test$lg.bottom.hint.pred.prob <- predict(lg_bottom_hint,newdata=test,type='response')
-test.lg.bottom.hint.pred <- prediction(test$lg.bottom.hint.pred.prob, test$bottom_hint)
-test.lg.bottom.hint.perf <- performance(test.lg.bottom.hint.pred, "auc")
-cat('the auc score is ', 100*test.lg.bottom.hint.perf@y.values[[1]], "\n")  
-#calculate the five smallest and five largest coefficients 
-lg_bottom_hint_coef <- summary(lg_bottom_hint)[["coefficients"]]
-lg_bottom_hint_coef[order(lg_bottom_hint_coef[ , 1]), ]  
 
 ```
 
-The AUC of the logistic model predicting bottom_hint on the test dataset is 83.22287
-
-The five smallest and five largest coefficients in this model
-
-Smallest:
-1. answer_typechoose_1
-2. answer_typechoose_n
-3. prev_total_correct
-4. prev_avg_response_time
-5. prev_problem_requested_hint
-
-Largest:
-1. tutor_modetutor
-2. prev_percent_bottom_hint
-3. answer_typefill_in_1
-4. prev_avg_attempt_count
-5. prev_percent_problem_requested_hint
-
-```{r}
-# forward stepwise selection
-# error if includes anwser_type
-regfit.fwd = regsubsets(bottom_hint ~ tutor_mode + prev_total_correct +
-                          prev_percent_correct + prev_problem_requested_hint + 
-                          prev_percent_problem_requested_hint + prev_avg_response_time + 
-                          prev_total_bottom_hint + prev_percent_bottom_hint +
-                          prev_avg_attempt_count, data=train, method="forward")
-
-summary(regfit.fwd)
-reg_summary = summary(regfit.fwd)
-reg_summary
-```
-
-```{r}
-# code from textbook but couldn't get it to work yet
-# test.mat = model.matrix(bottom_hint ~ tutor_mode + prev_total_correct +
-#                           prev_percent_correct + prev_problem_requested_hint + 
-#                           prev_percent_problem_requested_hint + prev_avg_response_time + 
-#                           prev_total_bottom_hint + prev_percent_bottom_hint +
-#                           prev_avg_attempt_count, data=test)
-# 
-# val.errors=rep(NA,6)
-# for (i in 1:6){
-#   coefi=coef(regfit.fwd, id=i)
-#   pred=test.mat[,names(coefi)]%*%coefi
-#   val.errors[i]=mean((as.integer(test$bottom_hint)-pred)^2)
-# }
-# 
-# val.errors
-# 
-# which.min(val.errors)
-
-# plots to examine RSS, R2, Cp and BIC 
-{plot(reg_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
-plot(reg_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
-
-points(adj_r2_max, reg_summary$adjr2[adj_r2_max], col ="red", cex = 2, pch = 20)
-
-plot(reg_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
-cp_min = which.min(reg_summary$cp) # 10
-points(cp_min, reg_summary$cp[cp_min], col = "red", cex = 2, pch = 20)
-
-plot(reg_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
-bic_min = which.min(reg_summary$bic) # 6
-points(bic_min, reg_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
-```
-
-
-##Drop the predictors and refit the logistic model 
-```{r}
-# refit the model by dropping the following features based on the results from forward stepwise selection by including 6 features
-
-re_lg_bottom_hint <- glm(bottom_hint ~ prev_percent_correct +
-                           prev_total_correct +
-                           prev_problem_requested_hint +
-                           prev_percent_problem_requested_hint +
-                           prev_total_bottom_hint + prev_percent_bottom_hint,
-                          data=train, family="binomial")
-
-
-#compute AUC of this model on the test dataset  
-test$re.lg.bottom.hint.pred.prob <- predict(re_lg_bottom_hint,newdata=test,type='response')
-test.re.lg.bottom.hint.pred <- prediction(test$re.lg.bottom.hint.pred.prob, test$bottom_hint)
-test.re.lg.bottom.hint.perf <- performance(test.re.lg.bottom.hint.pred, "auc")
-cat('the auc score is ', 100*test.re.lg.bottom.hint.perf@y.values[[1]], "\n")  
-#calculate the five smallest and five largest coefficients 
-re_lg_bottom_hint_coef <- summary(re_lg_bottom_hint)[["coefficients"]]
-re_lg_bottom_hint_coef[order(re_lg_bottom_hint_coef[ , 1]), ]  
-
-```
-The AUC score of the revised logistic model for predicting bottom_hint on the test dataset is 82.30289
-
-The smallest andlargest coefficients in this model
-
-Smallest: prev_total_correct
-
-Largest: prev_percent_bottom_hint
-
-```{r}
-#fit a random forest model on train
-rf_bottom_hint <- randomForest(bottom_hint ~ prev_percent_correct +
-                           prev_total_correct +
-                           prev_problem_requested_hint + 
-                           prev_percent_problem_requested_hint + 
-                           prev_total_bottom_hint + prev_percent_bottom_hint, 
-               data=train, ntree=200, na.action=na.omit)
-
-#compute AUC of this model on the test dataset  
-test$rf.bottom.hint.pred.prob <- predict(rf_bottom_hint,newdata=test,type='prob')[,2]
-test.rf.bottom.hint.pred <- prediction(test$rf.bottom.hint.pred.prob, test$bottom_hint)
-test.rf.bottom.hint.perf <- performance(test.rf.bottom.hint.pred, "auc")
-cat('the auc score is ', 100*test.rf.bottom.hint.perf@y.values[[1]], "\n") 
-
-```
-The AUC score of randomforest model for predicting bottom_hint on the test dataset is 61.53358
-
-
-```{r}
-#compares the performance of two models using the plots
-##create a performance plot
-test.bh <- test %>% mutate(bottom_hint = as.integer(bottom_hint)-1)
-plot.data.rf.bh <- test.bh %>% arrange(desc(rf.bottom.hint.pred.prob)) %>% 
-  mutate(numrank = row_number(), percent.bottom.hint = cumsum(bottom_hint)/numrank,
-         method = rep("Random Forest",n())) %>% 
-  select(numrank, percent.bottom.hint, method)
-plot.data.lm.bh <- test.bh %>% arrange(desc(re.lg.bottom.hint.pred.prob)) %>% 
-  mutate(numrank = row_number(), percent.bottom.hint = cumsum(bottom_hint)/numrank,
-         method = rep("Logistic Regression",n())) %>% 
-  select(numrank, percent.bottom.hint,method)
-plot.data.bh <- bind_rows(plot.data.rf.bh,plot.data.lm.bh)
-##create plot
-theme_set(theme_bw())
-p <- ggplot(data=plot.data.bh, aes(x=numrank, y=percent.bottom.hint, col = method)) 
-p <- p + geom_line()
-p <- p + xlab('Number of Attempts') + xlim(1,1000)
-p <- p + scale_y_continuous("Percent of Using All Hints", limits=c(0.5,1), labels=scales::percent)
-p
-```
-```
 
 # Part D: Hint-Taking Prediction
 ```{r}
+
 ```
+
+
+
 # Part #: Scaffolding-Taking Prediction
 ** Right now, I don't want to predict scaffolding. This is too complicated to consider since if a problem has scaffolding and the student answers incorrectly or asks for the problem to be broken into steps, a new problem will be created called a scaffolding problem. LMK
