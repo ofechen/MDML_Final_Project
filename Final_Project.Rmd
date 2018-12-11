@@ -302,7 +302,7 @@ points(bic_min, reg_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
 
 ##Drop the predictors and refit the logistic model 
 ```{r}
-# refit the model by dropping the following features based on the results from forward stepwise selection by including 6 features
+# refit the model based on the results from forward stepwise selection by including 6 features
 
 re_lg_bottom_hint <- glm(bottom_hint ~ prev_percent_correct +
                            prev_total_correct +
