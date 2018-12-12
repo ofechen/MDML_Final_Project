@@ -454,6 +454,7 @@ regfit.c.fwd = regsubsets(correct ~ tutor_mode + prev_total_correct +
 
 reg_c_summary = summary(regfit.c.fwd)
 reg_c_summary
+
 ```
 ```{r}
 {plot(reg_c_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
