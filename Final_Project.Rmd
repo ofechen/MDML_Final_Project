@@ -1,5 +1,5 @@
 ---
-title: "MDML_Fianl_Project_YJ_FT_OC"
+title: "MDML_Final_Project_YJ_FT_OC"
 output: html_notebook
 author: Yeonji Jung, Frankie Tam, Ofer Chen
 ---
