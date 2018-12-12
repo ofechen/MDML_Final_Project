@@ -153,13 +153,59 @@ The features I decided to drop:
   (a1) prev_percent_problem_requested_hint, (b1) prev_total_correct, and (c1) prev_percent_bottom_hint, 
   and each had relatively low coefficient than its compared feature. 
   
+  
+```{r}
+# forward stepwise selection
+# error if includes anwser_type
+regfit.fa.fwd = regsubsets(first_action ~ tutor_mode + prev_total_correct +
+                          prev_percent_correct + prev_problem_requested_hint + 
+                          prev_percent_problem_requested_hint + prev_avg_response_time + 
+                          prev_total_bottom_hint + prev_percent_bottom_hint +
+                          prev_avg_attempt_count, data=train, method="forward")
+
+reg_fa_summary = summary(regfit.fa.fwd)
+reg_fa_summary
+```
+
+```{r}
+# plots to examine RSS, R2, Cp and BIC 
+{plot(reg_fa_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
+plot(reg_fa_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+
+adj_r2_max = which.max(reg_fa_summary$adjr2)
+
+points(adj_r2_max, reg_fa_summary$adjr2[adj_r2_max], col ="red", cex = 2, pch = 20)
+
+plot(reg_fa_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+cp_min = which.min(reg_fa_summary$cp) # 10
+points(cp_min, reg_fa_summary$cp[cp_min], col = "red", cex = 2, pch = 20)
+
+plot(reg_fa_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+bic_min = which.min(reg_fa_summary$bic) # 6
+points(bic_min, reg_fa_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
+
+
+```
+  
 ##Drop the predictors and refit the logistic model 
 ```{r}
-#refit a logistic regression model on train
-re_lg_hint <- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
-                 prev_percent_problem_requested_hint + prev_avg_response_time + 
-                 prev_percent_bottom_hint + prev_avg_attempt_count, 
+#refit a logistic regression model on train using 4 features based on forward stepwise selection
+
+# prev_problem_requested_hint 
+# prev_percent_problem_requested_hint
+# prev_total_bottom_hint 
+# prev_percent_bottom_hint
+
+# re_lg_hint <- glm(first_action ~ tutor_mode + answer_type + prev_total_correct + 
+#                  prev_percent_problem_requested_hint + prev_avg_response_time + 
+#                  prev_percent_bottom_hint + prev_avg_attempt_count, 
+#                data=train, family="binomial")
+
+re_lg_hint <- glm(first_action ~ prev_problem_requested_hint +
+                 prev_percent_problem_requested_hint + prev_total_bottom_hint +
+                 prev_percent_bottom_hint,
                data=train, family="binomial")
+
 #compute AUC of this model on the test dataset  
 test$re.lg.hint.pred.prob <- predict(re_lg_hint,newdata=test,type='response')
 test.re.lg.hint.pred <- prediction(test$re.lg.hint.pred.prob, test$first_action)
@@ -179,10 +225,16 @@ The smallest and five largest coefficients in this model
             
 ```{r}
 #fit a random forest model on train
-rf_hint <- randomForest(first_action ~ tutor_mode + answer_type + prev_total_correct + 
-                 prev_percent_problem_requested_hint + prev_avg_response_time + 
-                 prev_percent_bottom_hint + prev_avg_attempt_count, data=train, ntree=200, 
-                 na.action=na.omit)
+# rf_hint <- randomForest(first_action ~ tutor_mode + answer_type + prev_total_correct + 
+#                  prev_percent_problem_requested_hint + prev_avg_response_time + 
+#                  prev_percent_bottom_hint + prev_avg_attempt_count, data=train, ntree=200, 
+#                  na.action=na.omit)
+
+rf_hint <- randomForest(first_action ~ prev_problem_requested_hint +
+                 prev_percent_problem_requested_hint + prev_total_bottom_hint +
+                 prev_percent_bottom_hint,
+               data=train, ntree = 200, na.action=na.omit)
+
 #compute AUC of this model on the test dataset  
 test$rf.hint.pred.prob <- predict(rf_hint,newdata=test,type='prob')[,2]
 test.rf.hint.pred <- prediction(test$rf.hint.pred.prob, test$first_action)
@@ -254,15 +306,14 @@ Largest:
 ```{r}
 # forward stepwise selection
 # error if includes anwser_type
-regfit.fwd = regsubsets(bottom_hint ~ tutor_mode + prev_total_correct +
+regfit.bh.fwd = regsubsets(bottom_hint ~ tutor_mode + prev_total_correct +
                           prev_percent_correct + prev_problem_requested_hint + 
                           prev_percent_problem_requested_hint + prev_avg_response_time + 
                           prev_total_bottom_hint + prev_percent_bottom_hint +
                           prev_avg_attempt_count, data=train, method="forward")
 
-summary(regfit.fwd)
-reg_summary = summary(regfit.fwd)
-reg_summary
+reg_bh_summary = summary(regfit.bh.fwd)
+reg_bh_summary
 ```
 
 ```{r}
@@ -285,18 +336,20 @@ reg_summary
 # which.min(val.errors)
 
 # plots to examine RSS, R2, Cp and BIC 
-{plot(reg_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
-plot(reg_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+{plot(reg_bh_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
+plot(reg_bh_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
 
-points(adj_r2_max, reg_summary$adjr2[adj_r2_max], col ="red", cex = 2, pch = 20)
+adj_r2_max = which.max(reg_bh_summary$adjr2)
 
-plot(reg_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
-cp_min = which.min(reg_summary$cp) # 10
-points(cp_min, reg_summary$cp[cp_min], col = "red", cex = 2, pch = 20)
+points(adj_r2_max, reg_bh_summary$adjr2[adj_r2_max], col ="red", cex = 2, pch = 20)
 
-plot(reg_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
-bic_min = which.min(reg_summary$bic) # 6
-points(bic_min, reg_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
+plot(reg_bh_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+cp_min = which.min(reg_bh_summary$cp) # 10
+points(cp_min, reg_bh_summary$cp[cp_min], col = "red", cex = 2, pch = 20)
+
+plot(reg_bh_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+bic_min = which.min(reg_bh_summary$bic) # 6
+points(bic_min, reg_bh_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
 ```
 
 
@@ -310,7 +363,6 @@ re_lg_bottom_hint <- glm(bottom_hint ~ prev_percent_correct +
                            prev_percent_problem_requested_hint +
                            prev_total_bottom_hint + prev_percent_bottom_hint,
                           data=train, family="binomial")
-
 
 #compute AUC of this model on the test dataset  
 test$re.lg.bottom.hint.pred.prob <- predict(re_lg_bottom_hint,newdata=test,type='response')
@@ -370,10 +422,112 @@ p <- p + xlab('Number of Attempts') + xlim(1,1000)
 p <- p + scale_y_continuous("Percent of Using All Hints", limits=c(0.5,1), labels=scales::percent)
 p
 ```
+
+# Part D: Answer correctly without hint Prediction
+```{r}
+#fit a logistic regression model on train
+lg_correct <- glm(correct ~ tutor_mode + answer_type + prev_total_correct +
+                 prev_percent_correct + prev_problem_requested_hint +
+                 prev_percent_problem_requested_hint + prev_avg_response_time +
+                 prev_total_bottom_hint + prev_percent_bottom_hint + prev_avg_attempt_count,
+               data=train, family="binomial")
+
+#compute AUC of this model on the test dataset  
+test$lg.correct.pred.prob <- predict(lg_correct,newdata=test,type='response')
+test.lg.correct.pred <- prediction(test$lg.correct.pred.prob, test$correct)
+test.lg.correct.perf <- performance(test.lg.correct.pred, "auc")
+cat('the auc score is ', 100*test.lg.correct.perf@y.values[[1]], "\n")  
+#calculate the five smallest and five largest coefficients 
+lg_correct_coef <- summary(lg_correct)[["coefficients"]]
+lg_correct_coef[order(lg_correct_coef[ , 1]), ]  
 ```
 
-# Part D: Hint-Taking Prediction
+
 ```{r}
+# forward stepwise selection
+# error if includes anwser_type
+regfit.c.fwd = regsubsets(correct ~ tutor_mode + prev_total_correct +
+                          prev_percent_correct + prev_problem_requested_hint + 
+                          prev_percent_problem_requested_hint + prev_avg_response_time + 
+                          prev_total_bottom_hint + prev_percent_bottom_hint +
+                          prev_avg_attempt_count, data=train, method="forward")
+
+reg_c_summary = summary(regfit.c.fwd)
+reg_c_summary
 ```
+```{r}
+{plot(reg_c_summary$rss, xlab = "Number of Variables", ylab = "RSS", type = "l")
+plot(reg_c_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+
+adj_r2_max = which.max(reg_c_summary$adjr2)
+
+points(adj_r2_max, reg_c_summary$adjr2[adj_r2_max], col ="red", cex = 2, pch = 20)
+
+plot(reg_c_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+cp_min = which.min(reg_c_summary$cp) # 10
+points(cp_min, reg_c_summary$cp[cp_min], col = "red", cex = 2, pch = 20)
+
+plot(reg_c_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+bic_min = which.min(reg_c_summary$bic) # 6
+points(bic_min, reg_c_summary$bic[bic_min], col = "red", cex = 2, pch = 20)}
+```
+```{r}
+# refit the model based on the results from forward stepwise selection by including 5 features
+
+re_lg_correct <- glm(correct ~ prev_percent_correct +
+                           prev_total_correct +
+                           prev_percent_problem_requested_hint +
+                           prev_avg_attempt_count +
+                           prev_percent_bottom_hint,
+                          data=train, family="binomial")
+
+#compute AUC of this model on the test dataset  
+test$re.lg.correct.pred.prob <- predict(re_lg_correct,newdata=test,type='response')
+test.re.lg.correct.pred <- prediction(test$re.lg.correct.pred.prob, test$correct)
+test.re.lg.correct.perf <- performance(test.re.lg.correct.pred, "auc")
+cat('the auc score is ', 100*test.re.lg.correct.perf@y.values[[1]], "\n")  
+#calculate the five smallest and five largest coefficients 
+re_lg_correct_coef <- summary(re_lg_correct)[["coefficients"]]
+re_lg_correct_coef[order(re_lg_correct_coef[ , 1]), ]  
+```
+
+```{r}
+#fit a random forest model on train
+rf_correct <- randomForest(correct ~ prev_percent_correct +
+                           prev_total_correct +
+                           prev_percent_problem_requested_hint +
+                           prev_avg_attempt_count +
+                           prev_percent_bottom_hint,
+               data=train, ntree=200, na.action=na.omit)
+
+#compute AUC of this model on the test dataset  
+test$rf.correct.pred.prob <- predict(rf_correct,newdata=test,type='prob')[,2]
+test.rf.correct.pred <- prediction(test$rf.correct.pred.prob, test$correct)
+test.rf.correct.perf <- performance(test.rf.correct.pred, "auc")
+cat('the auc score is ', 100*test.rf.correct.perf@y.values[[1]], "\n") 
+
+```
+```{r}
+#compares the performance of two models using the plots
+##create a performance plot
+test.correct <- test %>% mutate(correct = as.integer(correct)-1)
+plot.data.rf.correct <- test.correct %>% arrange(desc(rf.correct.pred.prob)) %>% 
+  mutate(numrank = row_number(), percent.correct = cumsum(correct)/numrank,
+         method = rep("Random Forest",n())) %>% 
+  select(numrank, percent.correct, method)
+plot.data.lm.correct <- test.correct %>% arrange(desc(re.lg.correct.pred.prob)) %>% 
+  mutate(numrank = row_number(), percent.correct = cumsum(correct)/numrank,
+         method = rep("Logistic Regression",n())) %>% 
+  select(numrank, percent.correct,method)
+plot.data.correct <- bind_rows(plot.data.rf.correct,plot.data.lm.correct)
+##create plot
+theme_set(theme_bw())
+p <- ggplot(data=plot.data.correct, aes(x=numrank, y=percent.correct, col = method)) 
+p <- p + geom_line()
+p <- p + xlab('Number of Attempts') + xlim(1,1000)
+p <- p + scale_y_continuous("Percent of correct answers", limits=c(0.5,1), labels=scales::percent)
+p
+```
+
 # Part #: Scaffolding-Taking Prediction
 ** Right now, I don't want to predict scaffolding. This is too complicated to consider since if a problem has scaffolding and the student answers incorrectly or asks for the problem to be broken into steps, a new problem will be created called a scaffolding problem. LMK
