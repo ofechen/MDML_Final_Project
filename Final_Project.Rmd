@@ -43,15 +43,6 @@ library(doParallel)
 library(foreach)
 library(car)
 library(ROCR)
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-=======
-library(leaps)
->>>>>>> parent of 469c3e9... Part C
-=======
-library(leaps)
->>>>>>> parent of 469c3e9... Part C
 #import the data
 df_raw <- read.csv("skill_builder_data.csv")
 ```
@@ -96,15 +87,9 @@ df_hist <- df_hist %>% group_by(user_id, order_id.x) %>%
             prev_avg_attempt_count = mean(attempt_count.y)) 
 df_hist <- replace(df_hist, is.na(df_hist), 0)
 df_fin <-  df_clean %>% left_join(df_hist)
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 # Maybe we should consider combining all skill ids in one variable and skill names in another
 
-=======
->>>>>>> parent of 469c3e9... Part C
-=======
->>>>>>> parent of 469c3e9... Part C
 #convert to factors
 df_fin <- df_fin %>%
   mutate_at(vars(first_action,correct,bottom_hint,problem_id,teacher_id, school_id),funs(as.factor))
@@ -229,18 +214,9 @@ p <- p + xlab('Number of Attempts') + xlim(1,1000)
 p <- p + scale_y_continuous("Percent of Attempts with Hint", limits=c(0.5,1), labels=scales::percent)
 p
 ```
-<<<<<<< HEAD
-
-=======
->>>>>>> parent of 469c3e9... Part C
 Overall, logistic regression shows a better performance than that of the random forest model.
 # Part C: Bottom-up-Hint-Taking Prediction
 ```{r}
-<<<<<<< HEAD
-
-```
-
-=======
 #fit a logistic regression model on train
 lg_bottom_hint <- glm(bottom_hint ~ tutor_mode + answer_type + prev_total_correct + 
                  prev_percent_correct + prev_problem_requested_hint + 
@@ -287,7 +263,6 @@ regfit.fwd = regsubsets(bottom_hint ~ prev_total_correct +
 summary(regfit.fwd)
 
 # find optimal model
-<<<<<<< HEAD
 
 test.mat = model.matrix(bottom_hint ~ prev_total_correct +
                           prev_percent_correct + prev_problem_requested_hint + 
@@ -307,8 +282,9 @@ for (i in 1:8) {
 ```{r}
 # refit the model with less features by dropping prev_total_correct, prev_avg_response_time, prev_problem_requested_hint
 
-=======
-
+##Drop the predictors and refit the logistic model 
+```{r}
+# refit the model based on the results from forward stepwise selection by including 6 features
 test.mat = model.matrix(bottom_hint ~ prev_total_correct +
                           prev_percent_correct + prev_problem_requested_hint + 
                           prev_percent_problem_requested_hint + prev_avg_response_time + 
@@ -324,10 +300,11 @@ for (i in 1:8) {
 
 ```
 
+
 ```{r}
 # refit the model with less features by dropping prev_total_correct, prev_avg_response_time, prev_problem_requested_hint
 
->>>>>>> parent of 469c3e9... Part C
+
 re_lg_bottom_hint <- glm(bottom_hint ~ tutor_mode + answer_type + 
                  prev_percent_correct + 
                  prev_percent_problem_requested_hint + 
@@ -360,19 +337,9 @@ Largest:
 3. answer_typefill_in_1
 4. prev_percent_problem_requested_hint
 5. prev_avg_attempt_count 
-<<<<<<< HEAD
->>>>>>> parent of 469c3e9... Part C
-=======
->>>>>>> parent of 469c3e9... Part C
 
 # Part D: Hint-Taking Prediction
 ```{r}
-<<<<<<< HEAD
-
-```
-
-
-=======
 #fit a random forest model on train
 rf_bottom_hint <- randomForest(bottom_hint ~ tutor_mode + answer_type + 
                  prev_percent_correct + 
@@ -387,14 +354,10 @@ test.rf.bottom.hint.perf <- performance(test.rf.bottom.hint.pred, "auc")
 cat('the auc score is ', 100*test.rf.bottom.hint.perf@y.values[[1]], "\n") 
 
 ```
-<<<<<<< HEAD
->>>>>>> parent of 469c3e9... Part C
-
-=======
 
 # Part D: Hint-Taking Prediction
 ```{r}
 ```
->>>>>>> parent of 469c3e9... Part C
+
 # Part #: Scaffolding-Taking Prediction
 ** Right now, I don't want to predict scaffolding. This is too complicated to consider since if a problem has scaffolding and the student answers incorrectly or asks for the problem to be broken into steps, a new problem will be created called a scaffolding problem. LMK
